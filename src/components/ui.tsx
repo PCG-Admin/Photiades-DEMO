@@ -5,6 +5,7 @@ import * as React from 'react';
 import { useState, useEffect, useId } from 'react';
 import { I, IconComponent } from './icons';
 import { cx, fmtMoney, TONE_VAR } from '@/lib/utils';
+import { useTr } from '@/lib/i18n';
 
 export { cx, fmtMoney };
 
@@ -249,13 +250,15 @@ export function Drawer({ children, onClose }: { children: React.ReactNode; onClo
   );
 }
 
-// Page header
+// Page header — auto-translates string titles/subtitles via the current language.
 export function PageHeader({ title, sub, actions }: { title: React.ReactNode; sub?: React.ReactNode; actions?: React.ReactNode }) {
+  const tr = useTr();
+  const T = (v: React.ReactNode) => (typeof v === 'string' ? tr(v) : v);
   return (
     <div className="row" style={{ justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 'var(--gap-6)', gap: 16, flexWrap: 'wrap' }}>
       <div>
-        <h2 style={{ margin: 0, fontSize: 22, fontWeight: 600, letterSpacing: '-0.02em' }}>{title}</h2>
-        {sub && <p style={{ margin: '6px 0 0', color: 'var(--muted)', fontSize: 13.5 }}>{sub}</p>}
+        <h2 style={{ margin: 0, fontSize: 22, fontWeight: 600, letterSpacing: '-0.02em' }}>{T(title)}</h2>
+        {sub && <p style={{ margin: '6px 0 0', color: 'var(--muted)', fontSize: 13.5 }}>{T(sub)}</p>}
       </div>
       {actions && <div className="row" style={{ gap: 10 }}>{actions}</div>}
     </div>

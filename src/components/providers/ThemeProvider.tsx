@@ -2,18 +2,21 @@
 
 import * as React from 'react';
 import { createContext, useContext, useEffect, useRef, useState } from 'react';
+import type { Lang } from '@/lib/i18n';
 
 export type Density = 'compact' | 'comfortable' | 'spacious';
 export interface ThemeState {
   accentHue: number;
   density: Density;
   dark: boolean;
+  lang: Lang;
 }
 
 export const THEME_DEFAULTS: ThemeState = {
   accentHue: 255,
   density: 'comfortable',
   dark: false,
+  lang: 'en',
 };
 
 const STORAGE_KEY = 'photiades-theme';
@@ -53,6 +56,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     r.style.setProperty('--accent-h', String(t.accentHue));
     r.style.setProperty('--density', t.density === 'compact' ? '0.85' : t.density === 'comfortable' ? '1' : '1.12');
     r.setAttribute('data-theme', t.dark ? 'dark' : 'light');
+    r.lang = t.lang === 'el' ? 'el' : 'en';
     if (hydrated.current) {
       try { localStorage.setItem(STORAGE_KEY, JSON.stringify(t)); } catch { /* ignore */ }
     }

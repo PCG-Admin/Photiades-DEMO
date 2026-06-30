@@ -9,6 +9,7 @@ import { Avatar, IconBtn } from '@/components/ui';
 import { CURRENT_USER } from '@/lib/data';
 import { cx } from '@/lib/utils';
 import { useTheme } from '@/components/providers/ThemeProvider';
+import { useTr } from '@/lib/i18n';
 import { logout } from '@/lib/auth-actions';
 
 interface NavItem { key: string; label: string; icon: IconComponent; count?: number }
@@ -50,6 +51,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const route = routeKey(pathname);
   const { t, setTweak } = useTheme();
+  const tr = useTr();
   const [profileOpen, setProfileOpen] = useState(false);
   const contentRef = useRef<HTMLElement>(null);
 
@@ -69,19 +71,19 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <div className="brand-mark">P</div>
           <div>
             <div className="brand-name">Photiades</div>
-            <div className="brand-sub">Workflow Portal</div>
+            <div className="brand-sub">{tr('Workflow Portal')}</div>
           </div>
         </div>
         <nav className="nav">
           {NAV.map(grp => (
             <div key={grp.section}>
-              <div className="nav-section-label">{grp.section}</div>
+              <div className="nav-section-label">{tr(grp.section)}</div>
               {grp.items.map(item => {
                 const Ico = item.icon;
                 return (
                   <Link key={item.key} href={href(item.key)} className={cx('nav-item', route === item.key && 'active')}>
                     <Ico size={18} />
-                    {item.label}
+                    {tr(item.label)}
                     {item.count != null && <span className="nav-count">{item.count}</span>}
                   </Link>
                 );
@@ -93,10 +95,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <div className="card" style={{ padding: 13, background: 'var(--accent-softer)', border: '1px solid var(--accent-soft)' }}>
             <div className="row" style={{ gap: 9, marginBottom: 6 }}>
               <div style={{ width: 26, height: 26, borderRadius: 7, background: 'var(--accent)', color: 'var(--on-accent)', display: 'grid', placeItems: 'center' }}><I.zap size={14} /></div>
-              <span style={{ fontSize: 12.5, fontWeight: 600 }}>Storage</span>
+              <span style={{ fontSize: 12.5, fontWeight: 600 }}>{tr('Storage')}</span>
             </div>
             <div className="progress" style={{ margin: '8px 0 6px' }}><span style={{ width: '64%' }} /></div>
-            <div className="faint" style={{ fontSize: 11 }}>64% of 2 TB · 1.28 TB used</div>
+            <div className="faint" style={{ fontSize: 11 }}>{tr('64% of 2 TB · 1.28 TB used')}</div>
           </div>
         </div>
       </aside>
@@ -105,18 +107,22 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <div className="main">
         <header className="topbar">
           <div className="row" style={{ gap: 8 }}>
-            <span className="crumb">Portal</span>
+            <span className="crumb">{tr('Portal')}</span>
             <I.chevR size={14} style={{ color: 'var(--faint)' }} />
-            <h1>{TITLES[route] ?? 'Dashboard'}</h1>
+            <h1>{tr(TITLES[route] ?? 'Dashboard')}</h1>
           </div>
           <div className="spacer" />
           <div className="search">
             <I.search size={16} />
-            <input placeholder="Search invoices, documents, vendors…" />
+            <input placeholder={tr('Search invoices, documents, vendors…')} />
             <kbd>⌘K</kbd>
           </div>
-          <IconBtn icon={t.dark ? I.sun : I.moon} onClick={() => setTweak('dark', !t.dark)} title="Toggle theme" />
-          <IconBtn icon={I.bell} badge title="Notifications" />
+          <div className="seg" style={{ marginRight: 2 }} title={tr('Language')}>
+            <button className={cx(t.lang !== 'el' && 'on')} onClick={() => setTweak('lang', 'en')}>EN</button>
+            <button className={cx(t.lang === 'el' && 'on')} onClick={() => setTweak('lang', 'el')}>ΕΛ</button>
+          </div>
+          <IconBtn icon={t.dark ? I.sun : I.moon} onClick={() => setTweak('dark', !t.dark)} title={tr('Toggle theme')} />
+          <IconBtn icon={I.bell} badge title={tr('Notifications')} />
           <div style={{ width: 1, height: 26, background: 'var(--border)', margin: '0 4px' }} />
           <button className="row" style={{ gap: 9, border: 'none', background: 'none', padding: '4px 6px', borderRadius: 9 }} onClick={() => setProfileOpen(true)}>
             <Avatar name={CURRENT_USER.name} size={34} />
@@ -141,6 +147,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 }
 
 function ProfileMenu({ onClose, dark, setDark }: { onClose: () => void; dark: boolean; setDark: (v: boolean) => void }) {
+  const tr = useTr();
   const items: { icon: IconComponent; label: string }[] = [
     { icon: I.users, label: 'My profile' },
     { icon: I.settings, label: 'Preferences' },
@@ -160,15 +167,15 @@ function ProfileMenu({ onClose, dark, setDark }: { onClose: () => void; dark: bo
         <div style={{ padding: 6 }}>
           {items.map(m => {
             const Ico = m.icon;
-            return <button key={m.label} className="nav-item" onClick={onClose}><Ico size={17} />{m.label}</button>;
+            return <button key={m.label} className="nav-item" onClick={onClose}><Ico size={17} />{tr(m.label)}</button>;
           })}
           <button className="nav-item" onClick={() => { setDark(!dark); }}>
-            {dark ? <I.sun size={17} /> : <I.moon size={17} />}{dark ? 'Light mode' : 'Dark mode'}
+            {dark ? <I.sun size={17} /> : <I.moon size={17} />}{dark ? tr('Light mode') : tr('Dark mode')}
           </button>
         </div>
         <div style={{ padding: 6, borderTop: '1px solid var(--border)' }}>
           <form action={logout}>
-            <button type="submit" className="nav-item" style={{ color: 'var(--red)', width: '100%' }}><I.logout size={17} />Sign out</button>
+            <button type="submit" className="nav-item" style={{ color: 'var(--red)', width: '100%' }}><I.logout size={17} />{tr('Sign out')}</button>
           </form>
         </div>
       </div>

@@ -8,9 +8,11 @@ import { fmtNum } from '@/lib/utils';
 import { INVOICES, AUDIT, DASHBOARD, relTime } from '@/lib/data';
 import type { AuditEvent } from '@/lib/data';
 import { useGo } from '@/lib/navigation';
+import { useTr } from '@/lib/i18n';
 
 export function DashboardView() {
   const go = useGo();
+  const tr = useTr();
   const d = DASHBOARD;
   const exceptions = INVOICES.filter(i => i.status === 'Exception');
   const recent = AUDIT.slice(0, 7);
@@ -22,16 +24,16 @@ export function DashboardView() {
         title="Good morning, Elena"
         sub="Thursday, 29 May 2026 · Here's what needs your attention across the portal."
         actions={<>
-          <button className="btn" onClick={() => go('reports')}><I.reports size={16} />View reports</button>
-          <button className="btn primary" onClick={() => go('capture')}><I.upload size={16} />Capture document</button>
+          <button className="btn" onClick={() => go('reports')}><I.reports size={16} />{tr('View reports')}</button>
+          <button className="btn primary" onClick={() => go('capture')}><I.upload size={16} />{tr('Capture document')}</button>
         </>}
       />
 
       <div className="kpi-grid stagger" style={{ marginBottom: 'var(--gap-5)' }}>
-        <div style={{ animationDelay: '0ms' }}><Kpi label="Documents captured" value={fmtNum(d.kpis.captured.value)} delta={d.kpis.captured.delta} deltaDir="up" sub="this month" icon={I.capture} tone="teal" /></div>
-        <div style={{ animationDelay: '60ms' }}><Kpi label="Invoices pending" value={d.kpis.pending.value} delta={d.kpis.pending.delta} deltaDir="up" sub="vs. yesterday" icon={I.invoice} tone="amber" /></div>
-        <div style={{ animationDelay: '120ms' }}><Kpi label="Awaiting your approval" value={d.kpis.awaitingYou.value} delta={d.kpis.awaitingYou.delta} deltaDir="down" sub="2 high priority" icon={I.approve} tone="blue" /></div>
-        <div style={{ animationDelay: '180ms' }}><Kpi label="Avg. processing time" value={d.kpis.avgCycle.value} delta={d.kpis.avgCycle.delta} deltaDir="down" sub="22% faster" icon={I.clock} tone="green" /></div>
+        <div style={{ animationDelay: '0ms' }}><Kpi label={tr('Documents captured')} value={fmtNum(d.kpis.captured.value)} delta={d.kpis.captured.delta} deltaDir="up" sub={tr('this month')} icon={I.capture} tone="teal" /></div>
+        <div style={{ animationDelay: '60ms' }}><Kpi label={tr('Invoices pending')} value={d.kpis.pending.value} delta={d.kpis.pending.delta} deltaDir="up" sub={tr('vs. yesterday')} icon={I.invoice} tone="amber" /></div>
+        <div style={{ animationDelay: '120ms' }}><Kpi label={tr('Awaiting your approval')} value={d.kpis.awaitingYou.value} delta={d.kpis.awaitingYou.delta} deltaDir="down" sub={tr('2 high priority')} icon={I.approve} tone="blue" /></div>
+        <div style={{ animationDelay: '180ms' }}><Kpi label={tr('Avg. processing time')} value={d.kpis.avgCycle.value} delta={d.kpis.avgCycle.delta} deltaDir="down" sub={tr('22% faster')} icon={I.clock} tone="green" /></div>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1.6fr 1fr', gap: 'var(--gap-5)', marginBottom: 'var(--gap-5)' }}>
@@ -39,10 +41,10 @@ export function DashboardView() {
         <div className="card">
           <div className="card-head">
             <div>
-              <div className="card-title">Workflow tasks</div>
-              <div className="card-sub">Invoices currently at each task</div>
+              <div className="card-title">{tr('Workflow tasks')}</div>
+              <div className="card-sub">{tr('Invoices currently at each task')}</div>
             </div>
-            <button className="btn ghost sm" onClick={() => go('workflows')}>Open<I.arrowR size={14} /></button>
+            <button className="btn ghost sm" onClick={() => go('workflows')}>{tr('Open')}<I.arrowR size={14} /></button>
           </div>
           <div className="card-pad">
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -70,7 +72,7 @@ export function DashboardView() {
         {/* Status mix donut */}
         <div className="card">
           <div className="card-head">
-            <div className="card-title">Invoice status</div>
+            <div className="card-title">{tr('Invoice status')}</div>
             <button className="icon-btn" onClick={() => go('invoices')}><I.arrowR size={16} /></button>
           </div>
           <div className="card-pad" style={{ display: 'grid', placeItems: 'center', paddingTop: 28 }}>
@@ -84,10 +86,10 @@ export function DashboardView() {
         <div className="card">
           <div className="card-head">
             <div>
-              <div className="card-title">Capture volume</div>
-              <div className="card-sub">Documents ingested this week</div>
+              <div className="card-title">{tr('Capture volume')}</div>
+              <div className="card-sub">{tr('Documents ingested this week')}</div>
             </div>
-            <Segmented options={['Week', 'Month']} value="Week" onChange={() => {}} />
+            <Segmented options={[{ value: 'Week', label: tr('Week') }, { value: 'Month', label: tr('Month') }]} value="Week" onChange={() => {}} />
           </div>
           <div className="card-pad">
             <BarChart data={d.volume} height={170} valueFmt={(v) => `${v} docs`} />
@@ -98,8 +100,8 @@ export function DashboardView() {
         <div className="card">
           <div className="card-head">
             <div>
-              <div className="card-title">Stock vs Non-stock</div>
-              <div className="card-sub">Indexed invoices · this month</div>
+              <div className="card-title">{tr('Stock vs Non-stock')}</div>
+              <div className="card-sub">{tr('Indexed invoices · this month')}</div>
             </div>
             <button className="icon-btn" onClick={() => go('workflows')}><I.arrowR size={16} /></button>
           </div>
@@ -113,18 +115,18 @@ export function DashboardView() {
         {/* Action queue */}
         <div className="card">
           <div className="card-head">
-            <div className="card-title">Needs your attention</div>
-            <Badge tone="amber">{exceptions.length + 6} items</Badge>
+            <div className="card-title">{tr('Needs your attention')}</div>
+            <Badge tone="amber">{exceptions.length + 6} {tr('items')}</Badge>
           </div>
           <div style={{ padding: '6px 0' }}>
-            <ActionRow icon={I.approve} tone="blue" title="6 invoices awaiting your approval"
-              sub="2 are high priority · oldest 2 days" onClick={() => go('workflows')} />
-            <ActionRow icon={I.alert} tone="red" title={`${exceptions.length} invoices with exceptions`}
-              sub="PO mismatch & duplicate detection" onClick={() => go('invoices')} />
-            <ActionRow icon={I.flag} tone="amber" title="4 documents need manual review"
-              sub="Low OCR confidence on key fields" onClick={() => go('capture')} />
-            <ActionRow icon={I.clock} tone="violet" title="3 approvals approaching SLA"
-              sub="Due within 24 hours" onClick={() => go('workflows')} />
+            <ActionRow icon={I.approve} tone="blue" title={tr('6 invoices awaiting your approval')}
+              sub={tr('2 are high priority · oldest 2 days')} onClick={() => go('workflows')} />
+            <ActionRow icon={I.alert} tone="red" title={`${exceptions.length} ${tr('invoices with exceptions')}`}
+              sub={tr('PO mismatch & duplicate detection')} onClick={() => go('invoices')} />
+            <ActionRow icon={I.flag} tone="amber" title={tr('4 documents need manual review')}
+              sub={tr('Low OCR confidence on key fields')} onClick={() => go('capture')} />
+            <ActionRow icon={I.clock} tone="violet" title={tr('3 approvals approaching SLA')}
+              sub={tr('Due within 24 hours')} onClick={() => go('workflows')} />
           </div>
         </div>
       </div>
@@ -132,8 +134,8 @@ export function DashboardView() {
       {/* Recent activity */}
       <div className="card">
         <div className="card-head">
-          <div className="card-title">Recent activity</div>
-          <button className="btn ghost sm" onClick={() => go('audit')}>View audit trail<I.arrowR size={14} /></button>
+          <div className="card-title">{tr('Recent activity')}</div>
+          <button className="btn ghost sm" onClick={() => go('audit')}>{tr('View audit trail')}<I.arrowR size={14} /></button>
         </div>
         <div style={{ padding: '8px 0' }}>
           {recent.map((e) => <ActivityRow key={e.id} e={e} />)}

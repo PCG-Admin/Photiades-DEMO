@@ -279,7 +279,7 @@ export function CaptureView() {
 
       {extracting && (
         <div className="card" style={{ padding: '10px 16px', marginBottom: 12, background: 'var(--accent-softer)', border: '1px solid var(--accent-soft)' }}>
-          <div className="row" style={{ gap: 10 }}><I.refresh size={15} style={{ animation: 'spin 0.9s linear infinite' }} /><span style={{ fontSize: 13 }}>Extracting fields with Gemini…</span></div>
+          <div className="row" style={{ gap: 10 }}><I.refresh size={15} style={{ animation: 'spin 0.9s linear infinite' }} /><span style={{ fontSize: 13 }}>Extracting fields…</span></div>
         </div>
       )}
       {extractError && !extracting && (

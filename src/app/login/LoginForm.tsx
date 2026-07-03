@@ -1,7 +1,7 @@
 'use client';
 
 import { useActionState } from 'react';
-import { login, type LoginState } from '@/lib/auth-actions';
+import { login, type LoginState } from '@/lib/server/auth-actions';
 import { I } from '@/components/icons';
 import { Spinner } from '@/components/ui';
 

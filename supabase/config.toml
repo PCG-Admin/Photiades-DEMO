@@ -1,0 +1,17 @@
+# Supabase CLI config stub.
+# Run `npx supabase login` then `npx supabase link --project-ref <your-project-ref>`
+# once the real project exists, then `npx supabase db push` to apply
+# supabase/migrations/*.sql.
+
+project_id = "photiades-workflow-portal"
+
+[api]
+enabled = true
+port = 54321
+
+[db]
+port = 54322
+
+[studio]
+enabled = true
+port = 54323

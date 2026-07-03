@@ -3,26 +3,25 @@
 /* Dashboard view */
 import * as React from 'react';
 import { I, IconComponent } from '@/components/icons';
-import { Badge, Kpi, BarChart, Donut, Segmented, PageHeader } from '@/components/ui';
-import { fmtNum } from '@/lib/utils';
-import { INVOICES, AUDIT, DASHBOARD, relTime } from '@/lib/data';
-import type { AuditEvent } from '@/lib/data';
+import { Badge, Kpi, Donut, PageHeader } from '@/components/ui';
+import { RelativeTime } from '@/components/RelativeTime';
+import { useCurrentUser } from '@/components/providers/CurrentUserProvider';
 import { useGo } from '@/lib/navigation';
 import { useTr } from '@/lib/i18n';
+import type { DashboardData } from '@/lib/server/dashboard';
+import type { AuditEventRow } from '@/lib/supabase/types';
 
-export function DashboardView() {
+export function DashboardView({ data, recentActivity }: { data: DashboardData; recentActivity: AuditEventRow[] }) {
   const go = useGo();
   const tr = useTr();
-  const d = DASHBOARD;
-  const exceptions = INVOICES.filter(i => i.status === 'Exception');
-  const recent = AUDIT.slice(0, 7);
-  const maxPipe = d.workflowTasks[0].count;
+  const currentUser = useCurrentUser();
+  const today = new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
 
   return (
     <div className="view-enter">
       <PageHeader
-        title="Good morning, Elena"
-        sub="Thursday, 29 May 2026 · Here's what needs your attention across the portal."
+        title={`Welcome, ${currentUser.name.split(' ')[0]}`}
+        sub={`${today} · Here's what needs your attention across the portal.`}
         actions={<>
           <button className="btn" onClick={() => go('reports')}><I.reports size={16} />{tr('View reports')}</button>
           <button className="btn primary" onClick={() => go('capture')}><I.upload size={16} />{tr('Capture document')}</button>
@@ -30,10 +29,9 @@ export function DashboardView() {
       />
 
       <div className="kpi-grid stagger" style={{ marginBottom: 'var(--gap-5)' }}>
-        <div style={{ animationDelay: '0ms' }}><Kpi label={tr('Documents captured')} value={fmtNum(d.kpis.captured.value)} delta={d.kpis.captured.delta} deltaDir="up" sub={tr('this month')} icon={I.capture} tone="teal" /></div>
-        <div style={{ animationDelay: '60ms' }}><Kpi label={tr('Invoices pending')} value={d.kpis.pending.value} delta={d.kpis.pending.delta} deltaDir="up" sub={tr('vs. yesterday')} icon={I.invoice} tone="amber" /></div>
-        <div style={{ animationDelay: '120ms' }}><Kpi label={tr('Awaiting your approval')} value={d.kpis.awaitingYou.value} delta={d.kpis.awaitingYou.delta} deltaDir="down" sub={tr('2 high priority')} icon={I.approve} tone="blue" /></div>
-        <div style={{ animationDelay: '180ms' }}><Kpi label={tr('Avg. processing time')} value={d.kpis.avgCycle.value} delta={d.kpis.avgCycle.delta} deltaDir="down" sub={tr('22% faster')} icon={I.clock} tone="green" /></div>
+        <div style={{ animationDelay: '0ms' }}><Kpi label="Invoices captured" value={data.totalInvoices} icon={I.invoice} tone="teal" /></div>
+        <div style={{ animationDelay: '60ms' }}><Kpi label="Workflows in progress" value={data.inProgressWorkflows} icon={I.zap} tone="amber" /></div>
+        <div style={{ animationDelay: '120ms' }}><Kpi label="Invoices with exceptions" value={data.exceptions} icon={I.alert} tone="red" /></div>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1.6fr 1fr', gap: 'var(--gap-5)', marginBottom: 'var(--gap-5)' }}>
@@ -47,25 +45,29 @@ export function DashboardView() {
             <button className="btn ghost sm" onClick={() => go('workflows')}>{tr('Open')}<I.arrowR size={14} /></button>
           </div>
           <div className="card-pad">
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              {d.workflowTasks.map((s, i) => (
-                <div key={s.stage} style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-                  <div style={{ width: 22, height: 22, borderRadius: 99, background: 'var(--accent-soft)', color: 'var(--accent-strong)', display: 'grid', placeItems: 'center', fontSize: 11, fontWeight: 700, flexShrink: 0 }}>{i + 1}</div>
-                  <div style={{ width: 132, fontSize: 12.5, fontWeight: 500, color: 'var(--text-2)' }}>{s.stage}</div>
-                  <div style={{ flex: 1, position: 'relative', height: 24 }}>
-                    <div style={{
-                      position: 'absolute', inset: 0, width: `${(s.count / maxPipe) * 100}%`,
-                      background: s.color, borderRadius: 6, opacity: 0.9,
-                      display: 'flex', alignItems: 'center', justifyContent: 'flex-end', paddingRight: 9,
-                      transition: 'width 0.7s cubic-bezier(0.22,1,0.36,1)', minWidth: 40,
-                      animation: `growBar 0.7s cubic-bezier(0.22,1,0.36,1)`,
-                    }}>
-                      <span className="mono tnum" style={{ fontSize: 11.5, fontWeight: 600, color: 'white' }}>{fmtNum(s.count)}</span>
+            {data.workflowTasks.length === 0 ? (
+              <div className="faint" style={{ fontSize: 13 }}>No invoices in-flight yet.</div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                {data.workflowTasks.map((s) => {
+                  const max = Math.max(...data.workflowTasks.map(t => t.count));
+                  return (
+                    <div key={s.stage} style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                      <div style={{ width: 160, fontSize: 12.5, fontWeight: 500, color: 'var(--text-2)' }}>{s.stage}</div>
+                      <div style={{ flex: 1, position: 'relative', height: 24 }}>
+                        <div style={{
+                          position: 'absolute', inset: 0, width: `${(s.count / max) * 100}%`,
+                          background: s.color, borderRadius: 6, opacity: 0.9,
+                          display: 'flex', alignItems: 'center', justifyContent: 'flex-end', paddingRight: 9, minWidth: 30,
+                        }}>
+                          <span className="mono tnum" style={{ fontSize: 11.5, fontWeight: 600, color: 'white' }}>{s.count}</span>
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                </div>
-              ))}
-            </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </div>
 
@@ -76,37 +78,7 @@ export function DashboardView() {
             <button className="icon-btn" onClick={() => go('invoices')}><I.arrowR size={16} /></button>
           </div>
           <div className="card-pad" style={{ display: 'grid', placeItems: 'center', paddingTop: 28 }}>
-            <Donut data={d.statusMix} size={158} thickness={24} />
-          </div>
-        </div>
-      </div>
-
-      <div style={{ display: 'grid', gridTemplateColumns: '1.3fr 1fr', gap: 'var(--gap-5)', marginBottom: 'var(--gap-5)' }}>
-        {/* Volume chart */}
-        <div className="card">
-          <div className="card-head">
-            <div>
-              <div className="card-title">{tr('Capture volume')}</div>
-              <div className="card-sub">{tr('Documents ingested this week')}</div>
-            </div>
-            <Segmented options={[{ value: 'Week', label: tr('Week') }, { value: 'Month', label: tr('Month') }]} value="Week" onChange={() => {}} />
-          </div>
-          <div className="card-pad">
-            <BarChart data={d.volume} height={170} valueFmt={(v) => `${v} docs`} />
-          </div>
-        </div>
-
-        {/* Stock / Non-stock mix donut */}
-        <div className="card">
-          <div className="card-head">
-            <div>
-              <div className="card-title">{tr('Stock vs Non-stock')}</div>
-              <div className="card-sub">{tr('Indexed invoices · this month')}</div>
-            </div>
-            <button className="icon-btn" onClick={() => go('workflows')}><I.arrowR size={16} /></button>
-          </div>
-          <div className="card-pad" style={{ display: 'grid', placeItems: 'center', paddingTop: 24, paddingBottom: 24 }}>
-            <Donut data={d.stockMix} size={150} thickness={23} />
+            {data.statusMix.length === 0 ? <div className="faint" style={{ fontSize: 13 }}>No invoices yet.</div> : <Donut data={data.statusMix} size={158} thickness={24} />}
           </div>
         </div>
       </div>
@@ -116,17 +88,13 @@ export function DashboardView() {
         <div className="card">
           <div className="card-head">
             <div className="card-title">{tr('Needs your attention')}</div>
-            <Badge tone="amber">{exceptions.length + 6} {tr('items')}</Badge>
+            <Badge tone="amber">{data.inProgressWorkflows + data.exceptions} {tr('items')}</Badge>
           </div>
           <div style={{ padding: '6px 0' }}>
-            <ActionRow icon={I.approve} tone="blue" title={tr('6 invoices awaiting your approval')}
-              sub={tr('2 are high priority · oldest 2 days')} onClick={() => go('workflows')} />
-            <ActionRow icon={I.alert} tone="red" title={`${exceptions.length} ${tr('invoices with exceptions')}`}
-              sub={tr('PO mismatch & duplicate detection')} onClick={() => go('invoices')} />
-            <ActionRow icon={I.flag} tone="amber" title={tr('4 documents need manual review')}
-              sub={tr('Low OCR confidence on key fields')} onClick={() => go('capture')} />
-            <ActionRow icon={I.clock} tone="violet" title={tr('3 approvals approaching SLA')}
-              sub={tr('Due within 24 hours')} onClick={() => go('workflows')} />
+            <ActionRow icon={I.approve} tone="blue" title={`${data.inProgressWorkflows} invoices awaiting a workflow decision`}
+              sub="Open Workflows to act" onClick={() => go('workflows')} />
+            <ActionRow icon={I.alert} tone="red" title={`${data.exceptions} invoices with exceptions`}
+              sub="Flagged during capture or review" onClick={() => go('invoices')} />
           </div>
         </div>
       </div>
@@ -138,7 +106,8 @@ export function DashboardView() {
           <button className="btn ghost sm" onClick={() => go('audit')}>{tr('View audit trail')}<I.arrowR size={14} /></button>
         </div>
         <div style={{ padding: '8px 0' }}>
-          {recent.map((e) => <ActivityRow key={e.id} e={e} />)}
+          {recentActivity.length === 0 && <div className="faint" style={{ fontSize: 12.5, padding: '10px 20px' }}>No activity yet</div>}
+          {recentActivity.map((e) => <ActivityRow key={e.id} e={e} />)}
         </div>
       </div>
     </div>
@@ -165,19 +134,19 @@ function ActionRow({ icon, tone, title, sub, onClick }: {
   );
 }
 
-function ActivityRow({ e }: { e: AuditEvent }) {
-  const Ico = I[e.icon] || I.doc;
-  const toneVar = ({ blue: 'var(--accent)', green: 'var(--green)', amber: 'var(--amber)', red: 'var(--red)', violet: 'var(--violet)', teal: 'var(--teal)', gray: 'var(--muted)' } as Record<string, string>)[e.tone];
-  const softVar = ({ blue: 'var(--accent-soft)', green: 'var(--green-soft)', amber: 'var(--amber-soft)', red: 'var(--red-soft)', violet: 'var(--violet-soft)', teal: 'var(--teal-soft)', gray: 'var(--surface-3)' } as Record<string, string>)[e.tone];
+function ActivityRow({ e }: { e: AuditEventRow }) {
+  const Ico = (e.icon && I[e.icon]) || I.doc;
+  const toneVar = ({ blue: 'var(--accent)', green: 'var(--green)', amber: 'var(--amber)', red: 'var(--red)', violet: 'var(--violet)', teal: 'var(--teal)', gray: 'var(--muted)' } as Record<string, string>)[e.tone ?? 'gray'];
+  const softVar = ({ blue: 'var(--accent-soft)', green: 'var(--green-soft)', amber: 'var(--amber-soft)', red: 'var(--red-soft)', violet: 'var(--violet-soft)', teal: 'var(--teal-soft)', gray: 'var(--surface-3)' } as Record<string, string>)[e.tone ?? 'gray'];
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '9px 20px' }}>
       <div style={{ width: 30, height: 30, borderRadius: 8, background: softVar, color: toneVar, display: 'grid', placeItems: 'center', flexShrink: 0 }}><Ico size={15} /></div>
       <div style={{ flex: 1, minWidth: 0, fontSize: 13 }}>
-        <span style={{ fontWeight: 600 }}>{e.user}</span>
+        <span style={{ fontWeight: 600 }}>{e.actor_name}</span>
         <span className="muted"> {e.action} </span>
         {e.target && <span className="mono" style={{ fontSize: 12, color: 'var(--accent-strong)' }}>{e.target}</span>}
       </div>
-      <span className="faint" style={{ fontSize: 11.5, whiteSpace: 'nowrap' }}>{relTime(e.when)}</span>
+      <span className="faint" style={{ fontSize: 11.5, whiteSpace: 'nowrap' }}><RelativeTime date={new Date(e.occurred_at)} /></span>
     </div>
   );
 }

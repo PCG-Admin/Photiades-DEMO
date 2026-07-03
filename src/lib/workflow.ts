@@ -1,7 +1,6 @@
-/* Stock / Non-Stock invoice workflow definitions + sample in-flight instances.
- * Ported from the design prototype (views_workflow.jsx). */
-
-import { INVOICES, PEOPLE, daysAgo } from './data';
+/* Stock / Non-Stock invoice workflow task/outcome/field DEFINITIONS — fixed
+ * SOW §5.3/§5.4 business rules, not database content. Workflow INSTANCES
+ * and their history live in Supabase (src/lib/server/workflows.ts). */
 
 export interface WFField {
   k: string;
@@ -42,27 +41,10 @@ export interface Workflow {
   short: string;
   tasks: WFTask[];
 }
-export interface WFInstance {
-  id: string;
-  wfId: string;
-  invId: string;
-  vendor: string;
-  invNo: string;
-  po: string | null;
-  amount: number;
-  taskIdx: number;
-  status: string;
-  started: Date;
-  assignee: string;
-}
-
 // ---- Picklists ----
 const WF_DOCS_OPTS = ['Yes', 'No', 'NA'];
 const WF_STK_OPTS = ['Stock', 'Non-stock', 'Stock & Non Stock'];
 const WF_SENT_OPTS = ['Yes', 'No', 'NA'];
-const WF_USERS = PEOPLE
-  .filter(p => ['AP Manager', 'Finance Director', 'Procurement Lead', 'Controller', 'CFO'].includes(p.role))
-  .map(p => p.name);
 
 // ---- Stock Invoice Workflow definition ----
 export const WF_STOCK_TASKS: WFTask[] = [
@@ -93,7 +75,7 @@ export const WF_STOCK_TASKS: WFTask[] = [
           { k: 'invNo', label: 'Invoice Number', type: 'ro', src: 'invNo' },
           { k: 'po', label: 'PO Number', type: 'ro', src: 'po' },
           { k: 'amount', label: 'Amount', type: 'ro-currency', src: 'amount' },
-          { k: 'approver', label: 'Select user to approve', type: 'select', options: WF_USERS, required: true },
+          { k: 'approver', label: 'Select user to approve', type: 'select', options: [], required: true },
           { k: 'com', label: 'Comment', type: 'textarea' },
         ] },
       { key: 'approved', label: 'Approved', tone: 'green', icon: 'check',
@@ -162,7 +144,7 @@ export const WF_STOCK_TASKS: WFTask[] = [
           { k: 'invNo', label: 'Invoice Number', type: 'ro', src: 'invNo' },
           { k: 'po', label: 'PO Number', type: 'ro', src: 'po' },
           { k: 'amount', label: 'Amount', type: 'ro-currency', src: 'amount' },
-          { k: 'approver', label: 'Select user to approve', type: 'select', options: WF_USERS, required: true },
+          { k: 'approver', label: 'Select user to approve', type: 'select', options: [], required: true },
           { k: 'com', label: 'Comment', type: 'textarea' },
         ] },
       { key: 'approved', label: 'Approved', tone: 'green', icon: 'check',
@@ -255,7 +237,7 @@ export const WF_NONSTOCK_TASKS: WFTask[] = [
           { k: 'invNo', label: 'Invoice Number', type: 'ro', src: 'invNo' },
           { k: 'po', label: 'PO Number', type: 'ro', src: 'po' },
           { k: 'amount', label: 'Amount', type: 'ro-currency', src: 'amount' },
-          { k: 'approver', label: 'Select user to approve', type: 'select', options: WF_USERS, required: true },
+          { k: 'approver', label: 'Select user to approve', type: 'select', options: [], required: true },
           { k: 'com', label: 'Comment', type: 'textarea' },
         ] },
       { key: 'approved', label: 'Approved', tone: 'green', icon: 'check',
@@ -324,7 +306,7 @@ export const WF_NONSTOCK_TASKS: WFTask[] = [
           { k: 'invNo', label: 'Invoice Number', type: 'ro', src: 'invNo' },
           { k: 'po', label: 'PO Number', type: 'ro', src: 'po' },
           { k: 'amount', label: 'Amount', type: 'ro-currency', src: 'amount' },
-          { k: 'approver', label: 'Select user to approve', type: 'select', options: WF_USERS, required: true },
+          { k: 'approver', label: 'Select user to approve', type: 'select', options: [], required: true },
           { k: 'com', label: 'Comment', type: 'textarea' },
         ] },
       { key: 'approved', label: 'Approved', tone: 'green', icon: 'check',
@@ -376,29 +358,6 @@ export const WORKFLOWS: Workflow[] = [
   { id: 'nonstock', name: 'Non-Stock Invoice Workflow', short: 'Non-Stock', tasks: WF_NONSTOCK_TASKS },
 ];
 export const wfById = (id: string) => WORKFLOWS.find(w => w.id === id) || WORKFLOWS[0];
-
-// ---- Sample in-flight instances (seeded from invoices) ----
-const stockSeed = INVOICES.filter(i => i.po).slice(0, 6);
-const nonStockSeed = INVOICES.filter(i => i.po).slice(6, 11);
-const STOCK_INSTANCES: WFInstance[] = stockSeed.map((inv, i) => {
-  const taskIdx = [0, 0, 3, 4, 5, 6][i];
-  const status = ['In Progress', 'Info Requested', 'In Progress', 'In Progress', 'In Progress', 'In Progress'][i];
-  return {
-    id: `WF-${3400 + i}`, wfId: 'stock', invId: inv.id, vendor: inv.vendor,
-    invNo: inv.invoiceNo, po: inv.po, amount: inv.total, taskIdx, status,
-    started: daysAgo(i + 1), assignee: WF_STOCK_TASKS[taskIdx].role,
-  };
-});
-const NONSTOCK_INSTANCES: WFInstance[] = nonStockSeed.map((inv, i) => {
-  const taskIdx = [0, 1, 2, 1, 0][i] ?? 0;
-  const status = ['In Progress', 'In Progress', 'In Progress', 'Info Requested', 'In Progress'][i];
-  return {
-    id: `WF-${3600 + i}`, wfId: 'nonstock', invId: inv.id, vendor: inv.vendor,
-    invNo: inv.invoiceNo, po: inv.po, amount: inv.total, taskIdx, status,
-    started: daysAgo(i + 1), assignee: WF_NONSTOCK_TASKS[taskIdx].role,
-  };
-});
-export const WF_INSTANCES: WFInstance[] = [...STOCK_INSTANCES, ...NONSTOCK_INSTANCES];
 
 export const ACTION_TONE_VAR = (t: string) => (({ green: 'var(--green)', red: 'var(--red)', amber: 'var(--amber)', violet: 'var(--violet)', teal: 'var(--teal)', gray: 'var(--muted)' } as Record<string, string>)[t]);
 export const ACTION_SOFT_VAR = (t: string) => (({ green: 'var(--green-soft)', red: 'var(--red-soft)', amber: 'var(--amber-soft)', violet: 'var(--violet-soft)', teal: 'var(--teal-soft)', gray: 'var(--surface-3)' } as Record<string, string>)[t]);

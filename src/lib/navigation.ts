@@ -5,6 +5,7 @@ import { useCallback } from 'react';
 
 export function routeFor(key: string, target?: string | null) {
   if (key === 'invoices' && target) return `/invoices?id=${encodeURIComponent(target)}`;
+  if (key === 'workflows' && target) return `/workflows?open=${encodeURIComponent(target)}`;
   return key === 'dashboard' ? '/dashboard' : `/${key}`;
 }
 

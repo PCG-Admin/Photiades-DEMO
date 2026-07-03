@@ -6,10 +6,17 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "supabase:link": "supabase link",
+    "supabase:push": "supabase db push",
+    "supabase:types": "supabase gen types typescript --linked > src/lib/supabase/types.ts"
   },
   "dependencies": {
+    "@google/genai": "^2.10.0",
+    "@supabase/ssr": "^0.12.0",
+    "@supabase/supabase-js": "^2.110.0",
     "next": "^16.2.9",
+    "pdfjs-dist": "^6.1.200",
     "react": "^19.2.7",
     "react-dom": "^19.2.7"
   },
@@ -19,6 +26,7 @@
     "@types/react-dom": "^19.2.3",
     "eslint": "^9.39.4",
     "eslint-config-next": "^16.2.9",
+    "supabase": "^2.109.0",
     "typescript": "^6.0.3"
   }
 }

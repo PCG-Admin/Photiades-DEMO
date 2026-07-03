@@ -4,39 +4,67 @@ import { useState } from 'react';
 import { I } from '@/components/icons';
 import { StatusBadge, Avatar, Badge, Segmented, Modal, PageHeader, MiniStat } from '@/components/ui';
 import { cx } from '@/lib/utils';
-import { USERS, ROLES, DEPTS, relTime, range, daysAgo, type User } from '@/lib/data';
+import { RelativeTime } from '@/components/RelativeTime';
+import { ROLES, DEPTS } from '@/lib/constants';
+import { createAppUser, updateAppUser, type NewAppUser } from '@/lib/server/users';
 import { useToast } from '@/components/providers/ToastProvider';
+import type { AppUserRow } from '@/lib/supabase/types';
+import { errorMessage } from '@/lib/errorMessage';
 
-type EditUser = Partial<User> & { isNew?: boolean };
+type EditUser = Partial<AppUserRow> & { isNew?: boolean; password?: string };
 
 // =================== USER ADMINISTRATION ===================
-export function AdminView() {
+export function AdminView({ initialUsers }: { initialUsers: AppUserRow[] }) {
   const toast = useToast();
-  const [users, setUsers] = useState<User[]>(USERS);
+  const [users, setUsers] = useState<AppUserRow[]>(initialUsers);
   const [tab, setTab] = useState('Users');
   const [edit, setEdit] = useState<EditUser | null>(null);
+  const [saving, setSaving] = useState(false);
 
   const roleTone: Record<string, string> = { Administrator: 'violet', 'AP Manager': 'blue', 'AP Clerk': 'teal', Approver: 'green', Auditor: 'amber', Viewer: 'gray' };
 
   const rolePerms = [
-    { role: 'Administrator', users: 1, perms: 'Full access · user & system config', tone: 'violet' },
-    { role: 'AP Manager', users: 1, perms: 'Approve, process, assign, report', tone: 'blue' },
-    { role: 'AP Clerk', users: 3, perms: 'Capture, process, submit', tone: 'teal' },
-    { role: 'Approver', users: 3, perms: 'Approve within threshold', tone: 'green' },
-    { role: 'Auditor', users: 1, perms: 'Read-only · audit & reports', tone: 'amber' },
-    { role: 'Viewer', users: 1, perms: 'Read-only · dashboards', tone: 'gray' },
+    { role: 'Administrator', perms: 'Full access · user & system config', tone: 'violet' },
+    { role: 'AP Manager', perms: 'Approve, process, assign, report', tone: 'blue' },
+    { role: 'AP Clerk', perms: 'Capture, process, submit', tone: 'teal' },
+    { role: 'Approver', perms: 'Approve within threshold', tone: 'green' },
+    { role: 'Auditor', perms: 'Read-only · audit & reports', tone: 'amber' },
+    { role: 'Viewer', perms: 'Read-only · dashboards', tone: 'gray' },
   ];
+
+  async function save(u: EditUser) {
+    setSaving(true);
+    try {
+      if (u.isNew) {
+        const created = await createAppUser(
+          { name: u.name ?? '', email: u.email ?? '', role: (u.role ?? 'AP Clerk') as AppUserRow['role'], dept: u.dept ?? 'Finance' },
+          u.password ?? ''
+        );
+        setUsers(prev => [created, ...prev]);
+        toast('User created — share their temporary password so they can sign in');
+      } else if (u.id) {
+        const patch: Partial<NewAppUser & { status: AppUserRow['status'] }> = { name: u.name, email: u.email, role: u.role as AppUserRow['role'], dept: u.dept, status: u.status };
+        const updated = await updateAppUser(u.id, patch);
+        setUsers(prev => prev.map(x => x.id === updated.id ? updated : x));
+        toast('User updated');
+      }
+      setEdit(null);
+    } catch (err) {
+      toast(`Save failed: ${errorMessage(err)}`);
+    } finally {
+      setSaving(false);
+    }
+  }
 
   return (
     <div className="view-enter">
       <PageHeader title="User Administration" sub="Manage users, roles, and access across the Photiades portal."
         actions={<button className="btn primary" onClick={() => setEdit({ name: '', email: '', role: 'AP Clerk', dept: 'Finance', status: 'Active', isNew: true })}><I.plus size={16} />Add user</button>} />
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 'var(--gap-4)', marginBottom: 'var(--gap-5)' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 'var(--gap-4)', marginBottom: 'var(--gap-5)' }}>
         <MiniStat label="Total users" value={users.length} sub={`${users.filter(u => u.status === 'Active').length} active`} tone="blue" />
-        <MiniStat label="Roles configured" value="6" tone="violet" />
-        <MiniStat label="MFA enabled" value={`${Math.round(users.filter(u => u.mfa).length / users.length * 100)}%`} sub="of all users" tone="green" />
-        <MiniStat label="Pending invites" value="2" tone="amber" />
+        <MiniStat label="Roles configured" value={ROLES.length} tone="violet" />
+        <MiniStat label="MFA enabled" value={users.length === 0 ? '—' : `${Math.round(users.filter(u => u.mfa_enabled).length / users.length * 100)}%`} sub="of all users" tone="green" />
       </div>
 
       <div className="tabs" style={{ marginBottom: 'var(--gap-5)' }}>
@@ -49,7 +77,7 @@ export function AdminView() {
         <div className="card" style={{ overflow: 'hidden' }}>
           <table className="tbl">
             <thead>
-              <tr><th>User</th><th>Role</th><th>Department</th><th>Status</th><th>MFA</th><th>Last active</th><th style={{ width: 40 }}></th></tr>
+              <tr><th>User</th><th>Role</th><th>Department</th><th>Status</th><th>MFA</th><th>Last active</th></tr>
             </thead>
             <tbody>
               {users.map(u => (
@@ -66,11 +94,11 @@ export function AdminView() {
                   <td><Badge tone={roleTone[u.role]}>{u.role}</Badge></td>
                   <td className="muted" style={{ fontSize: 12.5 }}>{u.dept}</td>
                   <td><StatusBadge status={u.status} /></td>
-                  <td>{u.mfa ? <span className="badge green"><I.shield size={12} />On</span> : <span className="faint" style={{ fontSize: 12 }}>Off</span>}</td>
-                  <td className="faint" style={{ fontSize: 12 }}>{relTime(u.lastActive)}</td>
-                  <td onClick={e => e.stopPropagation()}><button className="icon-btn" style={{ width: 28, height: 28 }}><I.dots size={16} /></button></td>
+                  <td>{u.mfa_enabled ? <span className="badge green"><I.shield size={12} />On</span> : <span className="faint" style={{ fontSize: 12 }}>Off</span>}</td>
+                  <td className="faint" style={{ fontSize: 12 }}>{u.last_active_at ? <RelativeTime date={new Date(u.last_active_at)} /> : 'Never'}</td>
                 </tr>
               ))}
+              {users.length === 0 && <tr><td colSpan={6} className="faint" style={{ padding: 20, textAlign: 'center' }}>No users yet</td></tr>}
             </tbody>
           </table>
         </div>
@@ -80,39 +108,37 @@ export function AdminView() {
             <div key={r.role} className="card card-pad">
               <div className="row" style={{ justifyContent: 'space-between', marginBottom: 12 }}>
                 <Badge tone={r.tone}>{r.role}</Badge>
-                <span className="muted" style={{ fontSize: 12 }}><span className="mono">{r.users}</span> {r.users === 1 ? 'user' : 'users'}</span>
+                <span className="muted" style={{ fontSize: 12 }}><span className="mono">{users.filter(u => u.role === r.role).length}</span> users</span>
               </div>
               <div style={{ fontSize: 13, color: 'var(--text-2)', lineHeight: 1.5 }}>{r.perms}</div>
-              <div className="row" style={{ gap: 8, marginTop: 16 }}>
-                <button className="btn sm"><I.edit size={13} />Edit role</button>
-                <button className="btn ghost sm">View permissions</button>
-              </div>
             </div>
           ))}
         </div>
       )}
 
-      {edit && <UserModal user={edit} roleTone={roleTone} onClose={() => setEdit(null)} onSave={(u) => {
-        if (u.isNew) { setUsers(prev => [{ ...u, id: `USR-${range(2030, 2099)}`, lastActive: daysAgo(0), mfa: false } as User, ...prev]); toast('User invited'); }
-        else { setUsers(prev => prev.map(x => x.id === u.id ? u as User : x)); toast('User updated'); }
-        setEdit(null);
-      }} />}
+      {edit && <UserModal user={edit} saving={saving} onClose={() => setEdit(null)} onSave={save} />}
     </div>
   );
 }
 
-function UserModal({ user, onClose, onSave }: { user: EditUser; roleTone: Record<string, string>; onClose: () => void; onSave: (u: EditUser) => void }) {
+function UserModal({ user, saving, onClose, onSave }: { user: EditUser; saving: boolean; onClose: () => void; onSave: (u: EditUser) => void }) {
   const [form, setForm] = useState<EditUser>(user);
   const set = (k: keyof EditUser, v: string) => setForm(f => ({ ...f, [k]: v }));
   return (
-    <Modal title={user.isNew ? 'Add user' : 'Edit user'} sub={user.isNew ? 'Invite a new member to the portal' : user.email} onClose={onClose}
+    <Modal title={user.isNew ? 'Add user' : 'Edit user'} sub={user.isNew ? 'Create a new directory entry' : user.email} onClose={onClose}
       footer={<>
         <button className="btn" onClick={onClose}>Cancel</button>
-        <button className="btn primary" onClick={() => onSave(form)} disabled={!form.name}>{user.isNew ? 'Send invite' : 'Save changes'}</button>
+        <button className="btn primary" onClick={() => onSave(form)} disabled={!form.name || (user.isNew && !form.password) || saving}>{saving ? 'Saving…' : user.isNew ? 'Create' : 'Save changes'}</button>
       </>}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
         <div className="field"><label>Full name</label><input className="input" value={form.name} onChange={e => set('name', e.target.value)} placeholder="e.g. Andreas Pavlou" /></div>
         <div className="field"><label>Email</label><input className="input" value={form.email} onChange={e => set('email', e.target.value)} placeholder="name@photiades.com.cy" /></div>
+        {user.isNew && (
+          <div className="field">
+            <label>Temporary password</label>
+            <input className="input" type="text" value={form.password ?? ''} onChange={e => set('password', e.target.value)} placeholder="Shared with the user to sign in" />
+          </div>
+        )}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
           <div className="field"><label>Role</label>
             <select className="input" value={form.role} onChange={e => set('role', e.target.value)}>

@@ -1,48 +1,54 @@
 'use client';
 
 import * as React from 'react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { I } from '@/components/icons';
 import { Badge, Avatar, Segmented, PageHeader, MiniStat } from '@/components/ui';
 import { fmtMoney } from '@/lib/utils';
-import { CURRENT_USER, relTime, daysAgo } from '@/lib/data';
+import { RelativeTime } from '@/components/RelativeTime';
 import { useToast } from '@/components/providers/ToastProvider';
+import { useGo } from '@/lib/navigation';
 import {
-  WORKFLOWS, wfById, WF_INSTANCES, ACTION_TONE_VAR, ACTION_SOFT_VAR,
-  type WFTask, type WFAction, type WFField, type WFInstance, type WFBranch,
+  WORKFLOWS, wfById, ACTION_TONE_VAR, ACTION_SOFT_VAR,
+  type WFTask, type WFAction, type WFField, type WFBranch,
 } from '@/lib/workflow';
-
-type HistoryEntry = {
-  task: string;
-  action: string;
-  by: string;
-  when: Date;
-  tone: string;
-  fields?: Record<string, string | number>;
-};
+import {
+  advanceWorkflowTask, getWorkflowInstanceDetail,
+  type WorkflowInstanceListItem, type WorkflowInstanceDetail,
+} from '@/lib/server/workflows';
+import { listAppUsers } from '@/lib/server/users';
+import { errorMessage } from '@/lib/errorMessage';
 
 type Invoice = { invNo: string; po: string | null; amount: number };
 
+// WorkflowHistoryRow.fields is jsonb (typed as Json); every history row this
+// app writes is a flat string/number map, so treat it as one for display.
+function fieldsOf(fields: unknown): Record<string, unknown> {
+  return typeof fields === 'object' && fields !== null ? fields as Record<string, unknown> : {};
+}
+
 // =================== WORKFLOWS LIST ===================
-export function WorkflowsView() {
+export function WorkflowsView({ initialInstances, initialOpen = null }: { initialInstances: WorkflowInstanceListItem[]; initialOpen?: string | null }) {
   const toast = useToast();
-  const [instances, setInstances] = useState<WFInstance[]>(WF_INSTANCES);
-  const [open, setOpen] = useState<string | null>(null);
+  const go = useGo();
+  const [instances, setInstances] = useState<WorkflowInstanceListItem[]>(initialInstances);
+  const [open, setOpen] = useState<string | null>(initialOpen);
   const [wfId, setWfId] = useState('stock');
 
-  const updateInstance = (id: string, patch: Partial<WFInstance>) => setInstances(prev => prev.map(x => x.id === id ? { ...x, ...patch } : x));
+  function refreshOne(updatedCode: string, patch: Partial<WorkflowInstanceListItem['instance']>) {
+    setInstances(prev => prev.map(x => x.instance.code === updatedCode ? { ...x, instance: { ...x.instance, ...patch } } : x));
+  }
 
   if (open) {
-    const inst = instances.find(x => x.id === open)!;
-    return <WorkflowRunner inst={inst} onBack={() => setOpen(null)} toast={toast}
-      onUpdate={(patch) => updateInstance(open, patch)} />;
+    return <WorkflowRunner code={open} onBack={() => setOpen(null)} toast={toast} go={go}
+      onUpdate={(patch) => refreshOne(open, patch)} />;
   }
 
   const wf = wfById(wfId);
   const tasks = wf.tasks;
   const statusTone: Record<string, string> = { 'In Progress': 'blue', 'Info Requested': 'amber', 'Declined': 'red', 'Completed': 'green', 'Pending Payment': 'teal', 'Order not placed via PD': 'gray' };
-  const wfInstances = instances.filter(i => i.wfId === wfId);
-  const active = wfInstances.filter(i => i.status === 'In Progress' || i.status === 'Info Requested');
+  const wfInstances = instances.filter(i => i.instance.wf_id === wfId);
+  const active = wfInstances.filter(i => i.instance.status === 'In Progress' || i.instance.status === 'Info Requested');
   const branch = tasks.find(t => t.auto)?.branch;
 
   return (
@@ -57,8 +63,8 @@ export function WorkflowsView() {
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 'var(--gap-4)', marginBottom: 'var(--gap-5)' }}>
         <MiniStat label="Active workflows" value={active.length} sub="in progress" tone="blue" />
-        <MiniStat label="In approval" value={wfInstances.filter(i => i.status === 'In Progress' && i.taskIdx > 0).length} tone="violet" />
-        <MiniStat label="Info requested" value={wfInstances.filter(i => i.status === 'Info Requested').length} tone="amber" />
+        <MiniStat label="In approval" value={wfInstances.filter(i => i.instance.status === 'In Progress' && i.instance.task_idx > 0).length} tone="violet" />
+        <MiniStat label="Info requested" value={wfInstances.filter(i => i.instance.status === 'Info Requested').length} tone="amber" />
         <MiniStat label="Total value in flight" value={fmtMoney(active.reduce((s, i) => s + i.amount, 0))} tone="green" />
       </div>
 
@@ -98,28 +104,31 @@ export function WorkflowsView() {
             <tr><th>Workflow</th><th>Vendor</th><th className="right">Amount</th><th>Current task</th><th>Status</th><th>Started</th><th style={{ width: 40 }}></th></tr>
           </thead>
           <tbody>
-            {wfInstances.map(inst => (
-              <tr key={inst.id} className="clickable" onClick={() => setOpen(inst.id)}>
+            {wfInstances.map(({ instance: inst, invoiceCode, vendor, po, amount }) => (
+              <tr key={inst.id} className="clickable" onClick={() => setOpen(inst.code)}>
                 <td>
-                  <div className="mono" style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--accent-strong)' }}>{inst.id}</div>
-                  <div className="faint mono" style={{ fontSize: 11 }}>{inst.invNo} · {inst.po}</div>
+                  <div className="mono" style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--accent-strong)' }}>{inst.code}</div>
+                  <div className="faint mono" style={{ fontSize: 11 }}>{invoiceCode} · {po || 'No PO'}</div>
                 </td>
-                <td style={{ fontWeight: 500, fontSize: 13 }}>{inst.vendor}</td>
-                <td className="right num" style={{ fontWeight: 600 }}>{fmtMoney(inst.amount)}</td>
+                <td style={{ fontWeight: 500, fontSize: 13 }}>{vendor}</td>
+                <td className="right num" style={{ fontWeight: 600 }}>{fmtMoney(amount)}</td>
                 <td>
                   <div className="row" style={{ gap: 8 }}>
-                    <div style={{ width: 22, height: 22, borderRadius: 99, background: 'var(--accent-soft)', color: 'var(--accent-strong)', display: 'grid', placeItems: 'center', fontSize: 11, fontWeight: 700, flexShrink: 0 }}>{inst.taskIdx + 1}</div>
+                    <div style={{ width: 22, height: 22, borderRadius: 99, background: 'var(--accent-soft)', color: 'var(--accent-strong)', display: 'grid', placeItems: 'center', fontSize: 11, fontWeight: 700, flexShrink: 0 }}>{inst.task_idx + 1}</div>
                     <div>
-                      <div style={{ fontSize: 12.5, fontWeight: 500 }}>{tasks[inst.taskIdx].name}</div>
-                      <div className="faint" style={{ fontSize: 10.5 }}>{tasks[inst.taskIdx].role}</div>
+                      <div style={{ fontSize: 12.5, fontWeight: 500 }}>{tasks[inst.task_idx]?.name}</div>
+                      <div className="faint" style={{ fontSize: 10.5 }}>{tasks[inst.task_idx]?.role}</div>
                     </div>
                   </div>
                 </td>
                 <td><Badge tone={statusTone[inst.status]} dot>{inst.status}</Badge></td>
-                <td className="faint" style={{ fontSize: 12 }}>{relTime(inst.started)}</td>
+                <td className="faint" style={{ fontSize: 12 }}><RelativeTime date={new Date(inst.started_at)} /></td>
                 <td><I.chevR size={16} style={{ color: 'var(--faint)' }} /></td>
               </tr>
             ))}
+            {wfInstances.length === 0 && (
+              <tr><td colSpan={7} className="faint" style={{ padding: 20, textAlign: 'center', fontSize: 13 }}>No {wf.name.toLowerCase()} instances yet</td></tr>
+            )}
           </tbody>
         </table>
       </div>
@@ -128,29 +137,62 @@ export function WorkflowsView() {
 }
 
 // =================== WORKFLOW RUNNER ===================
-function WorkflowRunner({ inst, onBack, toast, onUpdate }: {
-  inst: WFInstance;
+function WorkflowRunner({ code, onBack, toast, go, onUpdate }: {
+  code: string;
   onBack: () => void;
   toast: (msg: string) => void;
-  onUpdate: (patch: Partial<WFInstance>) => void;
+  go: ReturnType<typeof useGo>;
+  onUpdate: (patch: Partial<WorkflowInstanceDetail>) => void;
 }) {
-  const wf = wfById(inst.wfId);
-  const tasks = wf.tasks;
-  // editable invoice fields (editable at Task 1, read-only after)
-  const [invoice, setInvoice] = useState<{ invNo: string; po: string | null; amount: number }>({ invNo: inst.invNo, po: inst.po, amount: inst.amount });
-  const [taskIdx, setTaskIdx] = useState<number>(inst.taskIdx);
-  const [status, setStatus] = useState<string>(inst.status);
-  const [history, setHistory] = useState<HistoryEntry[]>(() => [{ task: tasks[0].name, action: 'Workflow started', by: 'System', when: inst.started, tone: 'gray' }]);
+  const [detail, setDetail] = useState<WorkflowInstanceDetail | null>(null);
+  const [loading, setLoading] = useState(true);
   const [selAction, setSelAction] = useState<string | null>(null);
   const [form, setForm] = useState<Record<string, string | number>>({});
-  const [additionalPending, setAdditionalPending] = useState<{ approver: string; fromTask: number } | null>(null);
-  const [routing, setRouting] = useState<string | null>(null);
+  const [approvers, setApprovers] = useState<string[]>([]);
+  const [submitting, setSubmitting] = useState(false);
 
-  const task = tasks[taskIdx];
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const [d, users] = await Promise.all([getWorkflowInstanceDetail(code), listAppUsers()]);
+      if (cancelled) return;
+      setDetail(d);
+      setApprovers(users.map(u => u.name));
+      setLoading(false);
+    })();
+    return () => { cancelled = true; };
+  }, [code]);
+
+  async function reload() {
+    const d = await getWorkflowInstanceDetail(code);
+    setDetail(d);
+    if (d) onUpdate(d);
+  }
+
+  if (loading || !detail) {
+    return (
+      <div className="view-enter">
+        <button className="btn ghost sm" onClick={onBack}><I.chevL size={16} />Workflows</button>
+        <div className="empty" style={{ marginTop: 40 }}><I.zap size={32} /><div style={{ marginTop: 10 }}>Loading workflow…</div></div>
+      </div>
+    );
+  }
+
+  const wf = wfById(detail.wf_id);
+  const tasks = wf.tasks;
+  const task = tasks[detail.task_idx];
   const branch = tasks.find(t => t.auto)?.branch;
-  const terminal = ['Declined', 'Order not placed via PD'].includes(status);
-  const isComplete = status === 'Completed';
-  const isPendingPmt = status === 'Pending Payment';
+  const invoice: Invoice = { invNo: detail.invoiceCode, po: detail.po, amount: detail.amount };
+  const terminal = ['Declined', 'Order not placed via PD'].includes(detail.status);
+  const isComplete = detail.status === 'Completed';
+  const isPendingPmt = detail.status === 'Pending Payment';
+
+  // an "additional" action pauses the instance at the same task, awaiting
+  // additionalGrant/additionalDecline — recovered from the last history row.
+  const lastHistory = detail.history[detail.history.length - 1];
+  const additionalPending = (!terminal && !isComplete && !isPendingPmt && lastHistory?.action_key === 'additional' && lastHistory.task_id === task.id)
+    ? { approver: String(fieldsOf(lastHistory.fields).approver ?? 'Unknown'), fromTask: detail.task_idx }
+    : null;
 
   function selectAction(a: WFAction) {
     setSelAction(a.key);
@@ -161,62 +203,21 @@ function WorkflowRunner({ inst, onBack, toast, onUpdate }: {
     });
     setForm(initial);
   }
-
   const setField = (k: string, v: string | number) => setForm(f => ({ ...f, [k]: v }));
 
-  // advance to the next task; if past the end → Completed
-  function advanceTo(nextIdx: number, label: string) {
-    if (nextIdx >= tasks.length) {
-      setStatus('Completed'); onUpdate({ status: 'Completed' });
-      toast(`${label} — workflow complete`); return;
+  async function submitAction(actionKey: string, fieldsOverride?: Record<string, string | number>) {
+    if (!detail) return;
+    setSubmitting(true);
+    try {
+      await advanceWorkflowTask(detail.id, actionKey, fieldsOverride ?? form);
+      await reload();
+      setSelAction(null); setForm({});
+      toast('Workflow updated');
+    } catch (err) {
+      toast(errorMessage(err));
+    } finally {
+      setSubmitting(false);
     }
-    setTaskIdx(nextIdx); setStatus('In Progress');
-    onUpdate({ taskIdx: nextIdx, status: 'In Progress' });
-    toast(`${label} — sent to ${tasks[nextIdx].name}`);
-  }
-
-  function submit() {
-    const action = task.actions!.find(a => a.key === selAction)!;
-    const missing = action.fields.find(f => f.required && !String(form[f.k] || '').trim());
-    if (missing) { toast(`${missing.label} is required`); return; }
-
-    // persist edited invoice fields from the import task (index 0)
-    let nextInvoice = invoice;
-    if (taskIdx === 0 && selAction === 'approved') {
-      nextInvoice = { invNo: String(form.invNo), po: form.po == null ? null : String(form.po), amount: Number(form.amount) || invoice.amount };
-      setInvoice(nextInvoice);
-      onUpdate({ invNo: nextInvoice.invNo, po: nextInvoice.po, amount: nextInvoice.amount });
-    }
-
-    setHistory(h => [...h, { task: task.name, action: action.label, by: CURRENT_USER.name, when: daysAgo(0), tone: action.tone, fields: { ...form } }]);
-    setSelAction(null); setForm({});
-
-    // ---- generic state transitions ----
-    if (action.key === 'declined') { setStatus('Declined'); onUpdate({ status: 'Declined' }); toast('Workflow declined'); return; }
-    if (action.key === 'notPlaced') { setStatus('Order not placed via PD'); onUpdate({ status: 'Order not placed via PD' }); toast('Marked: order not placed via PD'); return; }
-    if (action.key === 'pendPmt') { setStatus('Pending Payment'); onUpdate({ status: 'Pending Payment' }); toast('Marked pending payment'); return; }
-    if (action.key === 'requestInfo') { setStatus('Info Requested'); setTaskIdx(0); onUpdate({ status: 'Info Requested', taskIdx: 0 }); toast('Info requested — returned to importer'); return; }
-    if (action.key === 'additional') { setAdditionalPending({ approver: String(form.approver), fromTask: taskIdx }); toast(`Routed to ${form.approver} for additional approval`); return; }
-    // forward (approved / reviewed)
-    advanceTo(taskIdx + 1, action.label);
-  }
-
-  function resolveAdditional(approve: boolean) {
-    const from = additionalPending!.fromTask;
-    setHistory(h => [...h, { task: tasks[from].name, action: approve ? 'Additional approval granted' : 'Additional approval declined', by: additionalPending!.approver, when: daysAgo(0), tone: approve ? 'green' : 'red' }]);
-    setAdditionalPending(null);
-    if (!approve) { setStatus('Declined'); onUpdate({ status: 'Declined' }); toast('Additional approval declined'); return; }
-    advanceTo(from + 1, 'Additional approval granted');
-  }
-
-  function confirmRouting() {
-    const over = invoice.amount > branch!.threshold;
-    const destIdx = over ? branch!.overIdx : branch!.underIdx;
-    setRouting(over ? branch!.over : branch!.under);
-    setTaskIdx(destIdx);
-    setHistory(h => [...h, { task: task.name, action: `Routed to ${tasks[destIdx].name}`, by: 'System', when: daysAgo(0), tone: 'teal' }]);
-    onUpdate({ taskIdx: destIdx });
-    toast(`Routed to ${tasks[destIdx].name}`);
   }
 
   const statusTone: Record<string, string> = { 'In Progress': 'blue', 'Info Requested': 'amber', 'Declined': 'red', 'Completed': 'green', 'Pending Payment': 'teal', 'Order not placed via PD': 'gray' };
@@ -227,24 +228,23 @@ function WorkflowRunner({ inst, onBack, toast, onUpdate }: {
         <button className="btn ghost sm" onClick={onBack}><I.chevL size={16} />Workflows</button>
         <div>
           <div className="row" style={{ gap: 10 }}>
-            <h2 style={{ margin: 0, fontSize: 19, fontWeight: 600 }} className="mono">{inst.id}</h2>
-            <Badge tone={statusTone[status]} dot>{status}</Badge>
+            <h2 style={{ margin: 0, fontSize: 19, fontWeight: 600 }} className="mono">{detail.code}</h2>
+            <Badge tone={statusTone[detail.status]} dot>{detail.status}</Badge>
           </div>
-          <div className="muted" style={{ fontSize: 13, marginTop: 3 }}>{wf.name} · {inst.vendor}</div>
+          <div className="muted" style={{ fontSize: 13, marginTop: 3 }}>{wf.name} · {detail.vendor}</div>
         </div>
         <div className="spacer" />
-        <button className="btn" onClick={() => toast('Opening linked invoice…')}><I.invoice size={15} />View invoice</button>
+        <button className="btn" onClick={() => go('invoices', detail.invoiceCode)}><I.invoice size={15} />View invoice</button>
       </div>
 
       {/* facts bar */}
       <div className="card" style={{ display: 'flex', gap: 0, marginBottom: 'var(--gap-5)', overflow: 'hidden' }}>
         {[
-          { l: 'Invoice Number', v: invoice.invNo, mono: true },
-          { l: 'PO Number', v: invoice.po, mono: true },
-          { l: 'Amount', v: fmtMoney(invoice.amount), mono: true, big: true },
-          { l: 'Linked invoice', v: inst.invId, mono: true },
+          { l: 'Invoice', v: detail.invoiceCode, mono: true },
+          { l: 'PO Number', v: detail.po || 'No PO', mono: true },
+          { l: 'Amount', v: fmtMoney(detail.amount), mono: true, big: true },
         ].map((f, i) => (
-          <div key={f.l} style={{ flex: 1, padding: '14px 20px', borderRight: i < 3 ? '1px solid var(--border)' : 'none' }}>
+          <div key={f.l} style={{ flex: 1, padding: '14px 20px', borderRight: i < 2 ? '1px solid var(--border)' : 'none' }}>
             <div className="muted" style={{ fontSize: 11 }}>{f.l}</div>
             <div className={f.mono ? 'mono' : ''} style={{ fontSize: f.big ? 18 : 14, fontWeight: f.big ? 700 : 600, marginTop: 4 }}>{f.v}</div>
           </div>
@@ -256,42 +256,49 @@ function WorkflowRunner({ inst, onBack, toast, onUpdate }: {
         <div className="card" style={{ position: 'sticky', top: 0 }}>
           <div className="card-head"><div className="card-title">Workflow tasks</div></div>
           <div className="card-pad">
-            <WFTimeline tasks={tasks} taskIdx={taskIdx} routing={routing} terminal={terminal} isComplete={isComplete} isPendingPmt={isPendingPmt} additionalPending={additionalPending} amount={invoice.amount} branch={branch} />
+            <WFTimeline tasks={tasks} taskIdx={detail.task_idx} terminal={terminal} isComplete={isComplete} isPendingPmt={isPendingPmt} additionalPending={additionalPending} amount={detail.amount} branch={branch} />
           </div>
         </div>
 
         {/* Active task panel */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--gap-5)' }}>
           {terminal ? (
-            <TerminalCard status={status} />
+            <TerminalCard status={detail.status} />
           ) : isComplete ? (
-            <CompletedCard amount={invoice.amount} />
+            <CompletedCard amount={detail.amount} />
           ) : isPendingPmt ? (
             <PendingPaymentCard />
           ) : additionalPending ? (
-            <AdditionalCard approver={additionalPending.approver} invoice={invoice} onResolve={resolveAdditional} />
+            <AdditionalCard approver={additionalPending.approver} invoice={invoice} submitting={submitting}
+              onResolve={(grant) => submitAction(grant ? 'additionalGrant' : 'additionalDecline', {})} />
           ) : task.auto ? (
-            <AmountCheckCard amount={invoice.amount} onConfirm={confirmRouting} />
+            <AmountCheckCard amount={detail.amount} branch={branch} submitting={submitting} onConfirm={() => submitAction('routeAmountCheck', {})} />
           ) : (
-            <ActiveTaskCard task={task} taskIdx={taskIdx} selAction={selAction} onSelect={selectAction}
-              form={form} setField={setField} invoice={invoice} onSubmit={submit} onCancel={() => setSelAction(null)} />
+            <ActiveTaskCard task={task} taskIdx={detail.task_idx} selAction={selAction} onSelect={selectAction}
+              form={form} setField={setField} invoice={invoice} approvers={approvers} submitting={submitting}
+              onSubmit={() => submitAction(selAction!)} onCancel={() => setSelAction(null)} />
           )}
 
           {/* History */}
           <div className="card">
-            <div className="card-head"><div className="card-title">Workflow history</div><Badge tone="gray">{history.length}</Badge></div>
+            <div className="card-head"><div className="card-title">Workflow history</div><Badge tone="gray">{detail.history.length}</Badge></div>
             <div style={{ padding: '8px 0' }}>
-              {history.map((h, i) => (
-                <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '10px 20px', borderBottom: i < history.length - 1 ? '1px solid var(--border)' : 'none' }}>
-                  <div style={{ width: 8, height: 8, borderRadius: 99, background: ACTION_TONE_VAR(h.tone), marginTop: 5, flexShrink: 0 }} />
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 13 }}><span style={{ fontWeight: 600 }}>{h.by}</span> <span className="muted">· {h.task}</span></div>
-                    <div style={{ fontSize: 12.5, color: ACTION_TONE_VAR(h.tone), fontWeight: 600, marginTop: 1 }}>{h.action}</div>
-                    {h.fields?.com && <div className="muted" style={{ fontSize: 12, marginTop: 3, fontStyle: 'italic' }}>“{h.fields.com}”</div>}
+              {detail.history.length === 0 && <div className="faint" style={{ fontSize: 12.5, padding: '10px 20px' }}>No actions yet</div>}
+              {detail.history.map((h, i) => {
+                const action = tasks.find(t => t.id === h.task_id)?.actions?.find(a => a.key === h.action_key);
+                const tone = action?.tone ?? (h.action_key.includes('Grant') ? 'green' : h.action_key.includes('Decline') ? 'red' : 'gray');
+                return (
+                  <div key={h.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '10px 20px', borderBottom: i < detail.history.length - 1 ? '1px solid var(--border)' : 'none' }}>
+                    <div style={{ width: 8, height: 8, borderRadius: 99, background: ACTION_TONE_VAR(tone), marginTop: 5, flexShrink: 0 }} />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 13 }}><span style={{ fontWeight: 600 }}>{h.actor_name}</span> <span className="muted">· {h.task_name}</span></div>
+                      <div style={{ fontSize: 12.5, color: ACTION_TONE_VAR(tone), fontWeight: 600, marginTop: 1 }}>{h.action_label}</div>
+                      {typeof fieldsOf(h.fields).com === 'string' && Boolean(fieldsOf(h.fields).com) && <div className="muted" style={{ fontSize: 12, marginTop: 3, fontStyle: 'italic' }}>&ldquo;{String(fieldsOf(h.fields).com)}&rdquo;</div>}
+                    </div>
+                    <span className="faint" style={{ fontSize: 11, whiteSpace: 'nowrap' }}><RelativeTime date={new Date(h.occurred_at)} /></span>
                   </div>
-                  <span className="faint" style={{ fontSize: 11, whiteSpace: 'nowrap' }}>{relTime(h.when)}</span>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         </div>
@@ -300,10 +307,9 @@ function WorkflowRunner({ inst, onBack, toast, onUpdate }: {
   );
 }
 
-function WFTimeline({ tasks, taskIdx, routing, terminal, isComplete, isPendingPmt, additionalPending, amount, branch }: {
+function WFTimeline({ tasks, taskIdx, terminal, isComplete, isPendingPmt, additionalPending, amount, branch }: {
   tasks: WFTask[];
   taskIdx: number;
-  routing: string | null;
   terminal: boolean;
   isComplete: boolean;
   isPendingPmt: boolean;
@@ -313,11 +319,11 @@ function WFTimeline({ tasks, taskIdx, routing, terminal, isComplete, isPendingPm
 }) {
   const finished = isComplete || isPendingPmt;
   const branchIdx = branch ? tasks.findIndex(t => t.auto) : -1;
-  const lowValueRouted = branch && amount <= branch.threshold && (taskIdx > branchIdx || finished || terminal);
+  const lowValueRouted = branch != null && amount <= branch.threshold && (taskIdx > branchIdx || finished || terminal);
   return (
     <div>
       {tasks.map((t, i) => {
-        const skipped = branch && i === branch.skipIdx && lowValueRouted; // skipped on ≤ threshold path
+        const skipped = branch && i === branch.skipIdx && lowValueRouted;
         const done = !skipped && (i < taskIdx || (finished && i <= taskIdx));
         const active = i === taskIdx && !terminal && !finished;
         const isTerminalHere = terminal && i === taskIdx;
@@ -342,7 +348,6 @@ function WFTimeline({ tasks, taskIdx, routing, terminal, isComplete, isPendingPm
               {!skipped && active && additionalPending && <Badge tone="violet" dot>Awaiting additional approval</Badge>}
               {!skipped && active && !additionalPending && <Badge tone="blue" dot>Current</Badge>}
               {!skipped && done && <Badge tone="green">Done</Badge>}
-              {branch && i === branchIdx && routing && <div style={{ marginTop: 6 }}><Badge tone="teal" dot>→ {routing}</Badge></div>}
               {last && isComplete && <div style={{ marginTop: 6 }}><Badge tone="green" dot>Workflow complete</Badge></div>}
               {last && isPendingPmt && <div style={{ marginTop: 6 }}><Badge tone="teal" dot>Pending payment</Badge></div>}
             </div>
@@ -353,14 +358,16 @@ function WFTimeline({ tasks, taskIdx, routing, terminal, isComplete, isPendingPm
   );
 }
 
-function ActiveTaskCard({ task, taskIdx, selAction, onSelect, form, setField, invoice, onSubmit, onCancel }: {
+function ActiveTaskCard({ task, taskIdx, selAction, onSelect, form, setField, invoice, approvers, submitting, onSubmit, onCancel }: {
   task: WFTask;
   taskIdx: number;
   selAction: string | null;
   onSelect: (a: WFAction) => void;
   form: Record<string, string | number>;
   setField: (k: string, v: string | number) => void;
-  invoice: { invNo: string; po: string | null; amount: number };
+  invoice: Invoice;
+  approvers: string[];
+  submitting: boolean;
   onSubmit: () => void;
   onCancel: () => void;
 }) {
@@ -402,13 +409,13 @@ function ActiveTaskCard({ task, taskIdx, selAction, onSelect, form, setField, in
           <div style={{ animation: 'fadeUp 0.2s', borderTop: '1px solid var(--border)', paddingTop: 20 }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px 18px' }}>
               {action.fields.map(f => (
-                <WFFieldEl key={f.k} f={f} value={form[f.k]} onChange={(v) => setField(f.k, v)} invoice={invoice} />
+                <WFFieldEl key={f.k} f={f} value={form[f.k]} onChange={(v) => setField(f.k, v)} invoice={invoice} approvers={approvers} />
               ))}
             </div>
             <div className="row" style={{ gap: 10, marginTop: 22, justifyContent: 'flex-end' }}>
-              <button className="btn" onClick={onCancel}>Cancel</button>
-              <button className="btn" style={{ background: ACTION_TONE_VAR(action.tone), color: 'white', borderColor: 'transparent' }} onClick={onSubmit}>
-                <I.send size={15} />Submit · {action.label}
+              <button className="btn" onClick={onCancel} disabled={submitting}>Cancel</button>
+              <button className="btn" style={{ background: ACTION_TONE_VAR(action.tone), color: 'white', borderColor: 'transparent' }} onClick={onSubmit} disabled={submitting}>
+                <I.send size={15} />{submitting ? 'Submitting…' : `Submit · ${action.label}`}
               </button>
             </div>
           </div>
@@ -418,15 +425,17 @@ function ActiveTaskCard({ task, taskIdx, selAction, onSelect, form, setField, in
   );
 }
 
-function WFFieldEl({ f, value, onChange, invoice }: {
+function WFFieldEl({ f, value, onChange, invoice, approvers }: {
   f: WFField;
   value: string | number | undefined;
   onChange: (v: string | number) => void;
-  invoice: { invNo: string; po: string | null; amount: number };
+  invoice: Invoice;
+  approvers: string[];
 }) {
   const full = ['textarea'].includes(f.type) || f.k === 'approver';
   const isRO = f.type === 'ro' || f.type === 'ro-currency';
   const displayRO = f.type === 'ro-currency' ? fmtMoney(invoice[f.src as keyof Invoice] as number) : invoice[f.src as keyof Invoice];
+  const options = f.k === 'approver' ? approvers : f.options;
   return (
     <div style={{ gridColumn: full ? '1 / -1' : 'auto' }}>
       <label style={{ fontSize: 11.5, fontWeight: 500, color: 'var(--text-2)', display: 'block', marginBottom: 6 }}>
@@ -438,12 +447,12 @@ function WFFieldEl({ f, value, onChange, invoice }: {
           <I.shield size={13} style={{ color: 'var(--faint)' }} />{displayRO}
         </div>
       ) : f.type === 'textarea' ? (
-        <textarea className="input" rows={f.k === 'com' || f.k === 'comStored' ? 2 : 2} value={value || ''} onChange={e => onChange(e.target.value)}
+        <textarea className="input" rows={2} value={value || ''} onChange={e => onChange(e.target.value)}
           placeholder="Enter comment…" style={{ resize: 'vertical', fontFamily: 'var(--font)' }} />
       ) : f.type === 'select' ? (
         <select className="input" value={value || ''} onChange={e => onChange(e.target.value)}>
           <option value="">— Select —</option>
-          {f.options!.map(o => <option key={o}>{o}</option>)}
+          {options?.map(o => <option key={o}>{o}</option>)}
         </select>
       ) : f.type === 'currency' ? (
         <div style={{ position: 'relative' }}>
@@ -457,17 +466,15 @@ function WFFieldEl({ f, value, onChange, invoice }: {
   );
 }
 
-function AmountCheckCard({ amount, onConfirm }: { amount: number; onConfirm: () => void }) {
-  const over = amount > 500;
-  const dest = over ? 'PurchMgr-Approval' : 'AM - AcDep-Review';
+function AmountCheckCard({ amount, branch, submitting, onConfirm }: { amount: number; branch?: WFBranch; submitting: boolean; onConfirm: () => void }) {
+  const threshold = branch?.threshold ?? 500;
+  const over = amount > threshold;
+  const dest = over ? (branch?.over ?? 'PurchMgr-Approval') : (branch?.under ?? 'AM - AcDep-Review');
   return (
     <div className="card">
       <div className="card-head">
         <div>
-          <div className="row" style={{ gap: 9 }}>
-            <div style={{ width: 24, height: 24, borderRadius: 99, background: 'var(--accent)', color: 'var(--on-accent)', display: 'grid', placeItems: 'center', fontSize: 12, fontWeight: 700 }}>3</div>
-            <div className="card-title">Amount check over 500</div>
-          </div>
+          <div className="card-title">Amount check</div>
           <div className="card-sub" style={{ marginTop: 6 }}>Automatic threshold check determines the next approver.</div>
         </div>
         <Badge tone="violet" dot>System</Badge>
@@ -481,20 +488,7 @@ function AmountCheckCard({ amount, onConfirm }: { amount: number; onConfirm: () 
           <div style={{ fontSize: 20, color: 'var(--faint)', fontWeight: 600 }}>{over ? '>' : '≤'}</div>
           <div style={{ flex: 1, padding: 16, borderRadius: 10, background: 'var(--surface-2)', border: '1px solid var(--border)', textAlign: 'center' }}>
             <div className="muted" style={{ fontSize: 11.5 }}>Threshold</div>
-            <div className="mono" style={{ fontSize: 24, fontWeight: 700, marginTop: 4 }}>€500.00</div>
-          </div>
-        </div>
-
-        {/* branch diagram */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 22 }}>
-          <div style={{ padding: 14, borderRadius: 10, border: `1.5px solid ${over ? 'var(--teal)' : 'var(--border)'}`, background: over ? 'var(--teal-soft)' : 'var(--surface-2)', opacity: over ? 1 : 0.55 }}>
-            <div className="row" style={{ gap: 8 }}><I.arrowUp size={14} style={{ color: 'var(--teal)' }} /><span style={{ fontSize: 12.5, fontWeight: 600 }}>Over €500</span></div>
-            <div style={{ fontSize: 14, fontWeight: 700, marginTop: 6 }}>PurchMgr-Approval</div>
-          </div>
-          <div style={{ padding: 14, borderRadius: 10, border: `1.5px solid ${!over ? 'var(--accent)' : 'var(--border)'}`, background: !over ? 'var(--accent-soft)' : 'var(--surface-2)', opacity: !over ? 1 : 0.55 }}>
-            <div className="row" style={{ gap: 8 }}><I.arrowDown size={14} style={{ color: 'var(--accent)' }} /><span style={{ fontSize: 12.5, fontWeight: 600 }}>€500 or under</span></div>
-            <div style={{ fontSize: 14, fontWeight: 700, marginTop: 6 }}>AM - AcDep-Review</div>
-            <div className="faint" style={{ fontSize: 11, marginTop: 2 }}>skips PurchMgr</div>
+            <div className="mono" style={{ fontSize: 24, fontWeight: 700, marginTop: 4 }}>{fmtMoney(threshold)}</div>
           </div>
         </div>
 
@@ -506,16 +500,17 @@ function AmountCheckCard({ amount, onConfirm }: { amount: number; onConfirm: () 
         </div>
 
         <div className="row" style={{ justifyContent: 'flex-end' }}>
-          <button className="btn primary" onClick={onConfirm}><I.arrowR size={15} />Route to {dest}</button>
+          <button className="btn primary" onClick={onConfirm} disabled={submitting}><I.arrowR size={15} />{submitting ? 'Routing…' : `Route to ${dest}`}</button>
         </div>
       </div>
     </div>
   );
 }
 
-function AdditionalCard({ approver, invoice, onResolve }: {
+function AdditionalCard({ approver, invoice, submitting, onResolve }: {
   approver: string;
-  invoice: { invNo: string; po: string | null; amount: number };
+  invoice: Invoice;
+  submitting: boolean;
   onResolve: (approve: boolean) => void;
 }) {
   return (
@@ -532,12 +527,9 @@ function AdditionalCard({ approver, invoice, onResolve }: {
             <div className="muted" style={{ fontSize: 12.5 }}>Requested to provide additional approval for {fmtMoney(invoice.amount)}</div>
           </div>
         </div>
-        <div className="card" style={{ padding: '12px 16px', background: 'var(--surface-2)', marginBottom: 18, fontSize: 12.5, color: 'var(--text-2)' }}>
-          Acting as <strong>{approver}</strong> for this prototype — choose to grant or decline the additional approval.
-        </div>
         <div className="row" style={{ gap: 10, justifyContent: 'flex-end' }}>
-          <button className="btn danger" onClick={() => onResolve(false)}><I.x size={15} />Decline</button>
-          <button className="btn success" onClick={() => onResolve(true)}><I.check size={15} />Grant approval</button>
+          <button className="btn danger" onClick={() => onResolve(false)} disabled={submitting}><I.x size={15} />Decline</button>
+          <button className="btn success" onClick={() => onResolve(true)} disabled={submitting}><I.check size={15} />Grant approval</button>
         </div>
       </div>
     </div>
@@ -567,7 +559,7 @@ function CompletedCard({ amount }: { amount: number }) {
       </div>
       <div style={{ fontSize: 17, fontWeight: 600 }}>Workflow complete</div>
       <div className="muted" style={{ fontSize: 13, marginTop: 6, maxWidth: 400, marginInline: 'auto' }}>
-        The Accounts Department has given final approval. This {amount > 500 ? 'over-€500' : '≤ €500'} invoice has cleared all approval stages and is released for posting and payment.
+        The Accounts Department has given final approval. This invoice ({fmtMoney(amount)}) has cleared all approval stages and is released for posting and payment.
       </div>
     </div>
   );

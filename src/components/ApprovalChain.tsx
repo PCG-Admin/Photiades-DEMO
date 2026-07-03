@@ -2,7 +2,8 @@
 
 import { I } from '@/components/icons';
 import { Badge } from '@/components/ui';
-import { relTime, type ChainStep } from '@/lib/data';
+import { RelativeTime } from '@/components/RelativeTime';
+import type { ChainStep } from '@/lib/constants';
 
 // Vertical approval-chain timeline (shared by Invoice detail + Approvals)
 export function ApprovalChain({ steps }: { steps: ChainStep[]; amount?: number }) {
@@ -32,8 +33,7 @@ export function ApprovalChain({ steps }: { steps: ChainStep[]; amount?: number }
               </div>
               <div className="row" style={{ gap: 8, marginTop: 2 }}>
                 <Badge tone={done ? 'green' : active ? 'blue' : 'gray'}>{s.action}</Badge>
-                {s.when && <span className="faint" style={{ fontSize: 11.5 }}>{relTime(s.when)}</span>}
-                {active && <span className="muted" style={{ fontSize: 11.5 }}>· threshold &gt; €10,000</span>}
+                {s.when && <span className="faint" style={{ fontSize: 11.5 }}><RelativeTime date={s.when} /></span>}
               </div>
             </div>
           </div>

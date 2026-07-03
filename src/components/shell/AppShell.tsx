@@ -6,11 +6,13 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { I, IconComponent } from '@/components/icons';
 import { Avatar, IconBtn } from '@/components/ui';
-import { CURRENT_USER } from '@/lib/data';
+import { useRouter } from 'next/navigation';
 import { cx } from '@/lib/utils';
 import { useTheme } from '@/components/providers/ThemeProvider';
+import { useCurrentUser } from '@/components/providers/CurrentUserProvider';
+import type { CurrentAppUser } from '@/lib/server/users';
+import { logout } from '@/lib/server/auth-actions';
 import { useTr } from '@/lib/i18n';
-import { logout } from '@/lib/auth-actions';
 
 interface NavItem { key: string; label: string; icon: IconComponent; count?: number }
 interface NavGroup { section: string; items: NavItem[] }
@@ -18,13 +20,14 @@ interface NavGroup { section: string; items: NavItem[] }
 const NAV: NavGroup[] = [
   { section: 'Workspace', items: [
     { key: 'dashboard', label: 'Dashboard', icon: I.dashboard },
-    { key: 'capture', label: 'Document Capture', icon: I.capture, count: 22 },
-    { key: 'invoices', label: 'Invoice Processing', icon: I.invoice, count: 28 },
-    { key: 'workflows', label: 'Workflows', icon: I.zap, count: 6 },
+    { key: 'capture', label: 'Document Capture', icon: I.capture },
+    { key: 'invoices', label: 'Invoice Processing', icon: I.invoice },
+    { key: 'workflows', label: 'Workflows', icon: I.zap },
   ] },
   { section: 'Insight', items: [
     { key: 'reports', label: 'Reports', icon: I.reports },
     { key: 'audit', label: 'Audit Trail', icon: I.audit },
+    { key: 'notifications', label: 'Notifications', icon: I.bell },
   ] },
   { section: 'Administration', items: [
     { key: 'admin', label: 'User Administration', icon: I.users },
@@ -34,7 +37,7 @@ const NAV: NavGroup[] = [
 const TITLES: Record<string, string> = {
   dashboard: 'Dashboard', capture: 'Document Capture', invoices: 'Invoice Processing',
   approvals: 'Approvals', reports: 'Reports & Analytics', audit: 'Audit Trail', admin: 'User Administration',
-  workflows: 'Workflows',
+  workflows: 'Workflows', notifications: 'Notifications',
 };
 
 function routeKey(pathname: string): string {
@@ -47,11 +50,13 @@ function href(key: string) {
   return key === 'dashboard' ? '/dashboard' : `/${key}`;
 }
 
-export function AppShell({ children }: { children: React.ReactNode }) {
+export function AppShell({ children, unreadCount }: { children: React.ReactNode; unreadCount: number }) {
   const pathname = usePathname();
+  const router = useRouter();
   const route = routeKey(pathname);
   const { t, setTweak } = useTheme();
   const tr = useTr();
+  const currentUser = useCurrentUser();
   const [profileOpen, setProfileOpen] = useState(false);
   const contentRef = useRef<HTMLElement>(null);
 
@@ -60,8 +65,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     contentRef.current?.scrollTo(0, 0);
   }, [pathname]);
 
-  const firstName = CURRENT_USER.name.split(' ')[0];
-  const lastInitial = CURRENT_USER.name.split(' ')[1][0];
+  const nameParts = currentUser.name.split(' ');
+  const firstName = nameParts[0];
+  const lastInitial = nameParts[1]?.[0] ?? '';
 
   return (
     <div className="app">
@@ -122,13 +128,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <button className={cx(t.lang === 'el' && 'on')} onClick={() => setTweak('lang', 'el')}>ΕΛ</button>
           </div>
           <IconBtn icon={t.dark ? I.sun : I.moon} onClick={() => setTweak('dark', !t.dark)} title={tr('Toggle theme')} />
-          <IconBtn icon={I.bell} badge title={tr('Notifications')} />
+          <IconBtn icon={I.bell} badge={unreadCount > 0} onClick={() => router.push('/notifications')} title={tr('Notifications')} />
           <div style={{ width: 1, height: 26, background: 'var(--border)', margin: '0 4px' }} />
           <button className="row" style={{ gap: 9, border: 'none', background: 'none', padding: '4px 6px', borderRadius: 9 }} onClick={() => setProfileOpen(true)}>
-            <Avatar name={CURRENT_USER.name} size={34} />
+            <Avatar name={currentUser.name} size={34} />
             <div style={{ textAlign: 'left' }}>
               <div style={{ fontSize: 12.5, fontWeight: 600, lineHeight: 1.2 }}>{firstName} {lastInitial}.</div>
-              <div className="faint" style={{ fontSize: 10.5 }}>{CURRENT_USER.role}</div>
+              <div className="faint" style={{ fontSize: 10.5 }}>{currentUser.role}</div>
             </div>
             <I.chevD size={14} style={{ color: 'var(--faint)' }} />
           </button>
@@ -141,12 +147,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </main>
       </div>
 
-      {profileOpen && <ProfileMenu onClose={() => setProfileOpen(false)} dark={t.dark} setDark={(v) => setTweak('dark', v)} />}
+      {profileOpen && <ProfileMenu user={currentUser} onClose={() => setProfileOpen(false)} dark={t.dark} setDark={(v) => setTweak('dark', v)} />}
     </div>
   );
 }
 
-function ProfileMenu({ onClose, dark, setDark }: { onClose: () => void; dark: boolean; setDark: (v: boolean) => void }) {
+function ProfileMenu({ user, onClose, dark, setDark }: { user: CurrentAppUser; onClose: () => void; dark: boolean; setDark: (v: boolean) => void }) {
   const tr = useTr();
   const items: { icon: IconComponent; label: string }[] = [
     { icon: I.users, label: 'My profile' },
@@ -158,10 +164,10 @@ function ProfileMenu({ onClose, dark, setDark }: { onClose: () => void; dark: bo
       <div style={{ position: 'fixed', inset: 0, zIndex: 40 }} onClick={onClose} />
       <div style={{ position: 'fixed', top: 56, right: 24, zIndex: 41, width: 252, animation: 'scaleIn 0.15s', transformOrigin: 'top right' }} className="card">
         <div style={{ padding: 16, borderBottom: '1px solid var(--border)', display: 'flex', gap: 12, alignItems: 'center' }}>
-          <Avatar name={CURRENT_USER.name} size={42} />
+          <Avatar name={user.name} size={42} />
           <div>
-            <div style={{ fontWeight: 600, fontSize: 13.5 }}>{CURRENT_USER.name}</div>
-            <div className="faint" style={{ fontSize: 11.5 }}>elena.constantinou@photiades.com.cy</div>
+            <div style={{ fontWeight: 600, fontSize: 13.5 }}>{user.name}</div>
+            <div className="faint" style={{ fontSize: 11.5 }}>{user.email}</div>
           </div>
         </div>
         <div style={{ padding: 6 }}>
@@ -174,9 +180,9 @@ function ProfileMenu({ onClose, dark, setDark }: { onClose: () => void; dark: bo
           </button>
         </div>
         <div style={{ padding: 6, borderTop: '1px solid var(--border)' }}>
-          <form action={logout}>
-            <button type="submit" className="nav-item" style={{ color: 'var(--red)', width: '100%' }}><I.logout size={17} />{tr('Sign out')}</button>
-          </form>
+          <button className="nav-item" onClick={() => { void logout(); }} style={{ color: 'var(--red)' }}>
+            <I.logout size={17} />{tr('Sign out')}
+          </button>
         </div>
       </div>
     </>

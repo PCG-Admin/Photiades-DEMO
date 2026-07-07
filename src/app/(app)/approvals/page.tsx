@@ -4,6 +4,6 @@ import { getCurrentAppUser } from '@/lib/server/users';
 
 export default async function Page() {
   const user = await getCurrentAppUser();
-  const initialItems = await getApprovalsInbox(user.role);
+  const initialItems = await getApprovalsInbox(user.role, user.id);
   return <ApprovalsView initialItems={initialItems} />;
 }

@@ -42,6 +42,7 @@ export const I: Record<string, IconComponent> = {
   search: (p = {}) => <Icon {...p} paths={<><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></>} />,
   bell: (p = {}) => <Icon {...p} paths={<><path d="M18 8.5a6 6 0 0 0-12 0c0 6-2.5 7.5-2.5 7.5h17S18 14.5 18 8.5Z"/><path d="M13.5 19a2 2 0 0 1-3.5 0"/></>} />,
   plus: (p = {}) => <Icon {...p} d="M12 5v14M5 12h14" />,
+  minus: (p = {}) => <Icon {...p} d="M5 12h14" />,
   upload: (p = {}) => <Icon {...p} paths={<><path d="M12 15V4M8 8l4-4 4 4"/><path d="M4 14v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4"/></>} />,
   download: (p = {}) => <Icon {...p} paths={<><path d="M12 4v11M8 11l4 4 4-4"/><path d="M4 16v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></>} />,
   filter: (p = {}) => <Icon {...p} d="M4 5h16l-6 7v6l-4 2v-8L4 5Z" />,

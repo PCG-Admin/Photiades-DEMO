@@ -6,6 +6,7 @@ import { Avatar, Badge, PageHeader } from '@/components/ui';
 import { cx } from '@/lib/utils';
 import { fmtTime } from '@/lib/format';
 import { downloadCsv } from '@/lib/csv';
+import { downloadXlsx } from '@/lib/xlsx';
 import type { AuditEventRow } from '@/lib/supabase/types';
 
 const MODULES: AuditEventRow['module'][] = ['Invoices', 'Capture', 'Approvals', 'Admin', 'Reports', 'Auth', 'Workflows'];
@@ -28,18 +29,23 @@ export function AuditView({ initialEvents }: { initialEvents: AuditEventRow[] })
     (groups[key] = groups[key] || []).push(r);
   });
 
-  function exportLog() {
-    downloadCsv('audit-log.csv', rows.map(r => ({
+  function exportRows() {
+    return rows.map(r => ({
       time: r.occurred_at, actor: r.actor_name, role: r.actor_role, action: r.action,
       target: r.target ?? '', module: r.module,
       changes: r.changes ? r.changes.map(c => `${c.field}: ${c.before ?? ''} -> ${c.after ?? ''}`).join('; ') : '',
-    })));
+    }));
   }
 
   return (
     <div className="view-enter">
       <PageHeader title="Audit Trail" sub="Immutable, time-stamped log of every action across the portal."
-        actions={<button className="btn" onClick={exportLog}><I.download size={15} />Export log</button>} />
+        actions={
+          <div className="row" style={{ gap: 6 }}>
+            <button className="btn" onClick={() => downloadXlsx('audit-log.xlsx', exportRows())}><I.download size={15} />Export Excel</button>
+            <button className="btn" onClick={() => downloadCsv('audit-log.csv', exportRows())}><I.download size={15} />Export CSV</button>
+          </div>
+        } />
 
       <div className="card" style={{ marginBottom: 'var(--gap-5)', padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
         <div className="search" style={{ width: 300, padding: '6px 12px' }}>

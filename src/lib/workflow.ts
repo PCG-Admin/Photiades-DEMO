@@ -359,5 +359,11 @@ export const WORKFLOWS: Workflow[] = [
 ];
 export const wfById = (id: string) => WORKFLOWS.find(w => w.id === id) || WORKFLOWS[0];
 
+/** Tasks an admin can point an approver_mappings row at — excludes 'auto'
+ * (System-routed) tasks like the amount-check branch, since those never
+ * carry a human assignee. Used by AdminView's Approver Mapping tab. */
+export const ASSIGNABLE_TASKS: { id: string; label: string; defaultRole: string }[] = WORKFLOWS.flatMap(wf =>
+  wf.tasks.filter(t => !t.auto).map(t => ({ id: t.id, label: `${wf.short} — ${t.name}`, defaultRole: t.role })));
+
 export const ACTION_TONE_VAR = (t: string) => (({ green: 'var(--green)', red: 'var(--red)', amber: 'var(--amber)', violet: 'var(--violet)', teal: 'var(--teal)', gray: 'var(--muted)' } as Record<string, string>)[t]);
 export const ACTION_SOFT_VAR = (t: string) => (({ green: 'var(--green-soft)', red: 'var(--red-soft)', amber: 'var(--amber-soft)', violet: 'var(--violet-soft)', teal: 'var(--teal-soft)', gray: 'var(--surface-3)' } as Record<string, string>)[t]);

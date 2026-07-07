@@ -2,7 +2,8 @@
 
 import { createClient } from '@/lib/supabase/server';
 import { createServiceClient } from '@/lib/supabase/service';
-import type { AppUserRow } from '@/lib/supabase/types';
+import { recordAuditEvent } from '@/lib/server/audit';
+import type { AppUserRow, AuditChange } from '@/lib/supabase/types';
 
 export interface CurrentAppUser {
   id: string;
@@ -93,8 +94,16 @@ export async function createAppUser(input: NewAppUser, tempPassword: string): Pr
   return data;
 }
 
+/** T172 — access log: permission changes. Diffs role/status (and name/dept
+ * for completeness) against the pre-update row so role/access changes show
+ * up in the Audit Trail with field-level before/after, not just "updated". */
 export async function updateAppUser(id: string, patch: Partial<NewAppUser & { status: AppUserRow['status'] }>): Promise<AppUserRow> {
-  const { data, error } = await createServiceClient()
+  const supabase = createServiceClient();
+  const { data: before, error: beforeErr } = await supabase.from('app_users').select('*').eq('id', id).single()
+    .overrideTypes<AppUserRow, { merge: false }>();
+  if (beforeErr) throw beforeErr;
+
+  const { data, error } = await supabase
     .from('app_users')
     .update(patch as never)
     .eq('id', id)
@@ -102,6 +111,18 @@ export async function updateAppUser(id: string, patch: Partial<NewAppUser & { st
     .single()
     .overrideTypes<AppUserRow, { merge: false }>();
   if (error) throw error;
+
+  const changes: AuditChange[] = (['name', 'email', 'role', 'dept', 'status'] as const)
+    .filter(f => patch[f] !== undefined && patch[f] !== before[f])
+    .map(f => ({ field: f, before: before[f], after: data[f] }));
+  if (changes.length > 0) {
+    const isPermissionChange = changes.some(c => c.field === 'role' || c.field === 'status');
+    await recordAuditEvent({
+      action: isPermissionChange ? 'Changed user access' : 'Updated user',
+      module: 'Admin', target: data.name, changes,
+    });
+  }
+
   return data;
 }
 

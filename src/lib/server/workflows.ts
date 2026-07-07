@@ -5,6 +5,8 @@ import { genCode } from '@/lib/server/codes';
 import { wfById } from '@/lib/workflow';
 import { getCurrentAppUser, findAppUserByName } from '@/lib/server/users';
 import { getApprovalThreshold } from '@/lib/server/settings';
+import { resolveApproverForTask } from '@/lib/server/approverMappings';
+import { getUsersWhoDelegatedToMe } from '@/lib/server/delegations';
 import { recordAuditEvent } from '@/lib/server/audit';
 import { notifyRole } from '@/lib/server/notifications';
 import type { WorkflowInstanceRow, WorkflowHistoryRow, InvoiceRow } from '@/lib/supabase/types';
@@ -13,18 +15,27 @@ export interface WorkflowInstanceWithHistory extends WorkflowInstanceRow {
   history: WorkflowHistoryRow[];
 }
 
+/** Resolves who a task should be assigned to: a configured approver_mappings
+ * row for this task+amount takes priority (T169 — admin-configurable
+ * routing), falling back to the task's fixed WFTask.role when no mapping
+ * matches, so workflows keep working unmodified until an admin adds one. */
+async function resolveAssignee(taskId: string, amount: number, fallbackRole: string): Promise<{ assignee_role: string; assignee_id: string | null }> {
+  const mapping = await resolveApproverForTask(taskId, amount);
+  return mapping ? { assignee_role: mapping.role, assignee_id: mapping.userId } : { assignee_role: fallbackRole, assignee_id: null };
+}
+
 /** Starts the Stock or Non-Stock workflow for a newly captured invoice, at
  * its first task. Called by invoices.ts's createInvoiceFromExtraction(). */
-export async function createWorkflowInstance(invoiceId: string, wfId: WorkflowInstanceRow['wf_id']): Promise<WorkflowInstanceRow> {
+export async function createWorkflowInstance(invoiceId: string, wfId: WorkflowInstanceRow['wf_id'], amount: number): Promise<WorkflowInstanceRow> {
   const firstTask = wfById(wfId).tasks[0];
+  const assignee = await resolveAssignee(firstTask.id, amount, firstTask.role);
   const row = {
     code: genCode('WF'),
     wf_id: wfId,
     invoice_id: invoiceId,
     task_idx: 0,
     status: 'In Progress' as const,
-    assignee_role: firstTask.role,
-    assignee_id: null,
+    ...assignee,
   };
   // `as never` bypasses postgrest-js's insert-argument type resolution,
   // which breaks down to `never` under the project's TypeScript 6.
@@ -173,7 +184,7 @@ export async function advanceWorkflowTask(instanceId: string, actionKey: string,
     if (!branch) throw new Error(`Task "${task.name}" has no amount-check branch.`);
     const over = invoice.total > threshold;
     const destIdx = over ? branch.overIdx : branch.underIdx;
-    instancePatch = { task_idx: destIdx, assignee_role: tasks[destIdx].role, assignee_id: null };
+    instancePatch = { task_idx: destIdx, ...(await resolveAssignee(tasks[destIdx].id, invoice.total, tasks[destIdx].role)) };
     auditAction = `Amount check — routed to ${tasks[destIdx].name}`;
     await insertHistoryRow(instanceId, task.id, task.name, actionKey, `Routed to ${tasks[destIdx].name}`, null, 'System', fields);
   } else if (actionKey === 'additionalGrant' || actionKey === 'additionalDecline') {
@@ -186,7 +197,7 @@ export async function advanceWorkflowTask(instanceId: string, actionKey: string,
       const nextIdx = instance.task_idx + 1;
       instancePatch = nextIdx >= tasks.length
         ? { status: 'Completed', assignee_id: null }
-        : { task_idx: nextIdx, status: 'In Progress', assignee_role: tasks[nextIdx].role, assignee_id: null };
+        : { task_idx: nextIdx, status: 'In Progress', ...(await resolveAssignee(tasks[nextIdx].id, invoice.total, tasks[nextIdx].role)) };
       if (nextIdx >= tasks.length) invoicePatch = { status: 'Approved' };
     }
     auditAction = grant ? 'Additional approval granted' : 'Additional approval declined';
@@ -223,7 +234,7 @@ export async function advanceWorkflowTask(instanceId: string, actionKey: string,
         if (fields.nonStkDoc) invoicePatch.non_stock_doc_number = String(fields.nonStkDoc);
         break;
       case 'requestInfo':
-        instancePatch = { status: 'Info Requested', task_idx: 0, assignee_role: tasks[0].role, assignee_id: null };
+        instancePatch = { status: 'Info Requested', task_idx: 0, ...(await resolveAssignee(tasks[0].id, invoice.total, tasks[0].role)) };
         break;
       case 'additional': {
         const approver = await findAppUserByName(String(fields.approver || ''));
@@ -233,11 +244,12 @@ export async function advanceWorkflowTask(instanceId: string, actionKey: string,
       default: {
         // forward transitions: approved / reviewed
         const nextIdx = instance.task_idx + 1;
+        const amount = invoicePatch.total ?? invoice.total;
         if (nextIdx >= tasks.length) {
           instancePatch = { status: 'Completed' };
           invoicePatch.status = 'Approved';
         } else {
-          instancePatch = { task_idx: nextIdx, status: 'In Progress', assignee_role: tasks[nextIdx].role, assignee_id: null };
+          instancePatch = { task_idx: nextIdx, status: 'In Progress', ...(await resolveAssignee(tasks[nextIdx].id, amount, tasks[nextIdx].role)) };
         }
       }
     }
@@ -270,16 +282,22 @@ export async function advanceWorkflowTask(instanceId: string, actionKey: string,
 /** Approvals inbox (SOW's Approvals view, decision #4) — derived from
  * workflow_instances whose current task's role matches the caller's role;
  * never a separate table. */
-export async function getApprovalsInbox(userRole: string): Promise<ApprovalInboxItem[]> {
+export async function getApprovalsInbox(userRole: string, userId: string): Promise<ApprovalInboxItem[]> {
   const { data: instances, error } = await createServiceClient()
     .from('workflow_instances').select('*').eq('status', 'In Progress').order('started_at')
     .overrideTypes<WorkflowInstanceRow[], { merge: false }>();
   if (error) throw error;
 
+  // T170 — out-of-office backup approver: a task pinned to a specific
+  // assignee_id (e.g. an "Additional Approval" pick) surfaces in the
+  // backup's inbox too while the primary approver has an active delegation.
+  const delegatedFrom = userId === 'guest' ? [] : await getUsersWhoDelegatedToMe(userId);
+
   // Administrator sees every in-progress task (also the effective behavior
   // while there's no login and every visitor is the GUEST_USER Administrator
   // — see src/lib/server/users.ts).
-  const mine = userRole === 'Administrator' ? instances : instances.filter(i => i.assignee_role === userRole);
+  const mine = userRole === 'Administrator' ? instances : instances.filter(i =>
+    i.assignee_role === userRole || (i.assignee_id != null && delegatedFrom.includes(i.assignee_id)));
   if (mine.length === 0) return [];
 
   const { data: invoices, error: invErr } = await createServiceClient()

@@ -1,5 +1,7 @@
 import { ReportsView } from '@/views/ReportsView';
+import { requireModuleAccess } from '@/lib/server/permissions';
 
-export default function Page() {
+export default async function Page() {
+  await requireModuleAccess('reports');
   return <ReportsView />;
 }

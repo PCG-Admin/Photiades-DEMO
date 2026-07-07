@@ -5,13 +5,17 @@ import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { I, IconComponent } from '@/components/icons';
-import { Avatar, IconBtn } from '@/components/ui';
+import { Avatar, IconBtn, Modal } from '@/components/ui';
 import { useRouter } from 'next/navigation';
 import { cx } from '@/lib/utils';
 import { useTheme } from '@/components/providers/ThemeProvider';
 import { useCurrentUser } from '@/components/providers/CurrentUserProvider';
-import type { CurrentAppUser } from '@/lib/server/users';
+import { useToast } from '@/components/providers/ToastProvider';
 import { logout } from '@/lib/server/auth-actions';
+import { listAppUsers, type CurrentAppUser } from '@/lib/server/users';
+import { getMyDelegation, setMyDelegation, clearMyDelegation } from '@/lib/server/delegations';
+import { errorMessage } from '@/lib/errorMessage';
+import type { AppUserRow } from '@/lib/supabase/types';
 import { useTr } from '@/lib/i18n';
 
 interface NavItem { key: string; label: string; icon: IconComponent; count?: number }
@@ -50,7 +54,7 @@ function href(key: string) {
   return key === 'dashboard' ? '/dashboard' : `/${key}`;
 }
 
-export function AppShell({ children, unreadCount }: { children: React.ReactNode; unreadCount: number }) {
+export function AppShell({ children, unreadCount, accessibleModules }: { children: React.ReactNode; unreadCount: number; accessibleModules: string[] }) {
   const pathname = usePathname();
   const router = useRouter();
   const route = routeKey(pathname);
@@ -58,6 +62,7 @@ export function AppShell({ children, unreadCount }: { children: React.ReactNode;
   const tr = useTr();
   const currentUser = useCurrentUser();
   const [profileOpen, setProfileOpen] = useState(false);
+  const [delegationOpen, setDelegationOpen] = useState(false);
   const contentRef = useRef<HTMLElement>(null);
 
   // Reset the scroll position of the content region on navigation.
@@ -68,6 +73,11 @@ export function AppShell({ children, unreadCount }: { children: React.ReactNode;
   const nameParts = currentUser.name.split(' ');
   const firstName = nameParts[0];
   const lastInitial = nameParts[1]?.[0] ?? '';
+
+  // T168 — dashboard is always shown (see requireModuleAccess's dashboard
+  // guard note in src/app/(app)/dashboard/page.tsx for why it's exempt).
+  const visibleNav = NAV.map(grp => ({ ...grp, items: grp.items.filter(i => i.key === 'dashboard' || accessibleModules.includes(i.key)) }))
+    .filter(grp => grp.items.length > 0);
 
   return (
     <div className="app">
@@ -81,7 +91,7 @@ export function AppShell({ children, unreadCount }: { children: React.ReactNode;
           </div>
         </div>
         <nav className="nav">
-          {NAV.map(grp => (
+          {visibleNav.map(grp => (
             <div key={grp.section}>
               <div className="nav-section-label">{tr(grp.section)}</div>
               {grp.items.map(item => {
@@ -147,12 +157,18 @@ export function AppShell({ children, unreadCount }: { children: React.ReactNode;
         </main>
       </div>
 
-      {profileOpen && <ProfileMenu user={currentUser} onClose={() => setProfileOpen(false)} dark={t.dark} setDark={(v) => setTweak('dark', v)} />}
+      {profileOpen && (
+        <ProfileMenu user={currentUser} onClose={() => setProfileOpen(false)} dark={t.dark} setDark={(v) => setTweak('dark', v)}
+          onOpenDelegation={() => setDelegationOpen(true)} />
+      )}
+      {delegationOpen && <DelegationModal currentUserId={currentUser.id} onClose={() => setDelegationOpen(false)} />}
     </div>
   );
 }
 
-function ProfileMenu({ user, onClose, dark, setDark }: { user: CurrentAppUser; onClose: () => void; dark: boolean; setDark: (v: boolean) => void }) {
+function ProfileMenu({ user, onClose, dark, setDark, onOpenDelegation }: {
+  user: CurrentAppUser; onClose: () => void; dark: boolean; setDark: (v: boolean) => void; onOpenDelegation: () => void;
+}) {
   const tr = useTr();
   const items: { icon: IconComponent; label: string }[] = [
     { icon: I.users, label: 'My profile' },
@@ -175,6 +191,9 @@ function ProfileMenu({ user, onClose, dark, setDark }: { user: CurrentAppUser; o
             const Ico = m.icon;
             return <button key={m.label} className="nav-item" onClick={onClose}><Ico size={17} />{tr(m.label)}</button>;
           })}
+          <button className="nav-item" onClick={() => { onClose(); onOpenDelegation(); }}>
+            <I.history size={17} />{tr('Delegate approvals')}
+          </button>
           <button className="nav-item" onClick={() => { setDark(!dark); }}>
             {dark ? <I.sun size={17} /> : <I.moon size={17} />}{dark ? tr('Light mode') : tr('Dark mode')}
           </button>
@@ -186,5 +205,83 @@ function ProfileMenu({ user, onClose, dark, setDark }: { user: CurrentAppUser; o
         </div>
       </div>
     </>
+  );
+}
+
+function DelegationModal({ currentUserId, onClose }: { currentUserId: string; onClose: () => void }) {
+  const tr = useTr();
+  const toast = useToast();
+  const [users, setUsers] = useState<AppUserRow[] | null>(null);
+  const [hasExisting, setHasExisting] = useState(false);
+  const [backupUserId, setBackupUserId] = useState('');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [note, setNote] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    Promise.all([listAppUsers(), getMyDelegation()]).then(([u, d]) => {
+      setUsers(u);
+      if (d) {
+        setHasExisting(true);
+        setBackupUserId(d.backup_user_id);
+        setStartDate(d.start_date);
+        setEndDate(d.end_date);
+        setNote(d.note ?? '');
+      }
+    });
+  }, []);
+
+  async function save() {
+    setSaving(true);
+    try {
+      await setMyDelegation(backupUserId, startDate, endDate, note || null);
+      toast('Backup approver set');
+      onClose();
+    } catch (err) {
+      toast(`Save failed: ${errorMessage(err)}`);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function clear() {
+    setSaving(true);
+    try {
+      await clearMyDelegation();
+      toast('Delegation removed');
+      onClose();
+    } catch (err) {
+      toast(`Remove failed: ${errorMessage(err)}`);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Modal title="Delegate approvals" sub="Route your pending tasks to a backup approver while you're out" onClose={onClose}
+      footer={<>
+        {hasExisting && <button className="btn" onClick={clear} disabled={saving}>Remove delegation</button>}
+        <button className="btn" onClick={onClose}>Cancel</button>
+        <button className="btn primary" onClick={save} disabled={!backupUserId || !startDate || !endDate || saving}>{saving ? 'Saving…' : 'Save'}</button>
+      </>}>
+      {!users ? (
+        <div className="empty"><I.refresh size={24} style={{ animation: 'spin 0.9s linear infinite' }} /></div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div className="field"><label>{tr('Backup approver')}</label>
+            <select className="input" value={backupUserId} onChange={e => setBackupUserId(e.target.value)}>
+              <option value="">{tr('Select a user')}</option>
+              {users.filter(u => u.id !== currentUserId && u.status === 'Active').map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+            </select>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+            <div className="field"><label>{tr('Start date')}</label><input className="input" type="date" value={startDate} onChange={e => setStartDate(e.target.value)} /></div>
+            <div className="field"><label>{tr('End date')}</label><input className="input" type="date" value={endDate} onChange={e => setEndDate(e.target.value)} min={startDate || undefined} /></div>
+          </div>
+          <div className="field"><label>{tr('Note (optional)')}</label><input className="input" value={note} onChange={e => setNote(e.target.value)} placeholder={tr('e.g. Annual leave')} /></div>
+        </div>
+      )}
+    </Modal>
   );
 }

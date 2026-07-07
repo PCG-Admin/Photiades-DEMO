@@ -198,7 +198,7 @@ export async function createInvoiceFromExtraction(input: CaptureStoreInput, file
   }
 
   const wfId = input.stockType === 'Stock' ? 'stock' : 'nonstock';
-  await createWorkflowInstance(invoice.id, wfId);
+  await createWorkflowInstance(invoice.id, wfId, invoice.total);
 
   await recordAuditEvent({
     action: 'captured invoice',

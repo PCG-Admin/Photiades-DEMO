@@ -24,6 +24,25 @@ export async function markNotificationRead(id: string): Promise<void> {
   if (error) throw error;
 }
 
+export interface NotificationTarget { view: 'invoices' | 'workflows'; code: string }
+
+/** Notifications store ref_invoice_id/ref_instance_id as raw UUIDs, but
+ * InvoicesView/WorkflowsView both select by human-readable `code` — this
+ * resolves the UUID to the code so clicking a notification can actually
+ * navigate somewhere instead of just marking it read. */
+export async function resolveNotificationTarget(n: Pick<NotificationRow, 'ref_invoice_id' | 'ref_instance_id'>): Promise<NotificationTarget | null> {
+  const supabase = createServiceClient();
+  if (n.ref_instance_id) {
+    const { data } = await supabase.from('workflow_instances').select('code').eq('id', n.ref_instance_id).single();
+    if (data) return { view: 'workflows', code: (data as { code: string }).code };
+  }
+  if (n.ref_invoice_id) {
+    const { data } = await supabase.from('invoices').select('code').eq('id', n.ref_invoice_id).single();
+    if (data) return { view: 'invoices', code: (data as { code: string }).code };
+  }
+  return null;
+}
+
 /** Fans a system notification out to every app_users row with the given
  * role. Called from workflows.ts's advanceWorkflowTask() whenever a task's
  * assignee_role changes. */

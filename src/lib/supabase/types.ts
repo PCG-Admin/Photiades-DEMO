@@ -153,6 +153,34 @@ export interface NotificationRow {
   created_at: string;
 }
 
+export interface ApproverMappingRow {
+  id: string;
+  task_id: string;
+  min_amount: number | null;
+  max_amount: number | null;
+  approver_role: AppUserRow['role'];
+  approver_user_id: string | null;
+  created_at: string;
+}
+
+export type PortalModule = 'dashboard' | 'capture' | 'invoices' | 'workflows' | 'reports' | 'audit' | 'notifications' | 'admin';
+
+export interface RolePermissionRow {
+  role: AppUserRow['role'];
+  module: PortalModule;
+  can_access: boolean;
+}
+
+export interface DelegationRow {
+  id: string;
+  user_id: string;
+  backup_user_id: string;
+  start_date: string;
+  end_date: string;
+  note: string | null;
+  created_at: string;
+}
+
 export interface Database {
   public: {
     Tables: {
@@ -165,6 +193,9 @@ export interface Database {
       workflow_history: { Row: WorkflowHistoryRow; Insert: Omit<WorkflowHistoryRow, 'id' | 'occurred_at'> & Partial<Pick<WorkflowHistoryRow, 'id' | 'occurred_at'>>; Update: Partial<WorkflowHistoryRow>; Relationships: [] };
       audit_events: { Row: AuditEventRow; Insert: Omit<AuditEventRow, 'id' | 'occurred_at' | 'invoice_id' | 'changes'> & Partial<Pick<AuditEventRow, 'id' | 'occurred_at' | 'invoice_id' | 'changes'>>; Update: Partial<AuditEventRow>; Relationships: [] };
       notifications: { Row: NotificationRow; Insert: Omit<NotificationRow, 'id' | 'created_at'> & Partial<Pick<NotificationRow, 'id' | 'created_at'>>; Update: Partial<NotificationRow>; Relationships: [] };
+      approver_mappings: { Row: ApproverMappingRow; Insert: Omit<ApproverMappingRow, 'id' | 'created_at'> & Partial<Pick<ApproverMappingRow, 'id' | 'created_at'>>; Update: Partial<ApproverMappingRow>; Relationships: [] };
+      role_permissions: { Row: RolePermissionRow; Insert: RolePermissionRow; Update: Partial<RolePermissionRow>; Relationships: [] };
+      delegations: { Row: DelegationRow; Insert: Omit<DelegationRow, 'id' | 'created_at'> & Partial<Pick<DelegationRow, 'id' | 'created_at'>>; Update: Partial<DelegationRow>; Relationships: [] };
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;

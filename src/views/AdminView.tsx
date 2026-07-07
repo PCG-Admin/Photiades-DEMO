@@ -7,19 +7,41 @@ import { cx } from '@/lib/utils';
 import { RelativeTime } from '@/components/RelativeTime';
 import { ROLES, DEPTS } from '@/lib/constants';
 import { createAppUser, updateAppUser, type NewAppUser } from '@/lib/server/users';
+import { createApproverMapping, deleteApproverMapping, type NewApproverMapping } from '@/lib/server/approverMappings';
+import { setRolePermission } from '@/lib/server/permissions';
+import { ASSIGNABLE_TASKS } from '@/lib/workflow';
+import { fmtMoney } from '@/lib/utils';
 import { useToast } from '@/components/providers/ToastProvider';
-import type { AppUserRow } from '@/lib/supabase/types';
+import type { AppUserRow, ApproverMappingRow, RolePermissionRow, PortalModule } from '@/lib/supabase/types';
 import { errorMessage } from '@/lib/errorMessage';
 
 type EditUser = Partial<AppUserRow> & { isNew?: boolean; password?: string };
 
+const EDITABLE_ROLES = ROLES.filter(r => r !== 'Administrator') as AppUserRow['role'][];
+const PERMISSION_MODULES: { key: PortalModule; label: string; locked?: boolean }[] = [
+  { key: 'dashboard', label: 'Dashboard', locked: true },
+  { key: 'capture', label: 'Document Capture' },
+  { key: 'invoices', label: 'Invoice Processing' },
+  { key: 'workflows', label: 'Workflows' },
+  { key: 'reports', label: 'Reports' },
+  { key: 'audit', label: 'Audit Trail' },
+  { key: 'notifications', label: 'Notifications' },
+  { key: 'admin', label: 'User Administration' },
+];
+
 // =================== USER ADMINISTRATION ===================
-export function AdminView({ initialUsers }: { initialUsers: AppUserRow[] }) {
+export function AdminView({ initialUsers, initialMappings, initialPermissions }: {
+  initialUsers: AppUserRow[]; initialMappings: ApproverMappingRow[]; initialPermissions: RolePermissionRow[];
+}) {
   const toast = useToast();
   const [users, setUsers] = useState<AppUserRow[]>(initialUsers);
+  const [mappings, setMappings] = useState<ApproverMappingRow[]>(initialMappings);
+  const [permissions, setPermissions] = useState<RolePermissionRow[]>(initialPermissions);
   const [tab, setTab] = useState('Users');
   const [edit, setEdit] = useState<EditUser | null>(null);
   const [saving, setSaving] = useState(false);
+  const [addingMapping, setAddingMapping] = useState(false);
+  const [savingMapping, setSavingMapping] = useState(false);
 
   const roleTone: Record<string, string> = { Administrator: 'violet', 'AP Manager': 'blue', 'AP Clerk': 'teal', Approver: 'green', Auditor: 'amber', Viewer: 'gray' };
 
@@ -31,6 +53,23 @@ export function AdminView({ initialUsers }: { initialUsers: AppUserRow[] }) {
     { role: 'Auditor', perms: 'Read-only · audit & reports', tone: 'amber' },
     { role: 'Viewer', perms: 'Read-only · dashboards', tone: 'gray' },
   ];
+
+  function hasAccess(role: AppUserRow['role'], module: PortalModule): boolean {
+    return permissions.find(p => p.role === role && p.module === module)?.can_access ?? false;
+  }
+
+  async function togglePermission(role: AppUserRow['role'], module: PortalModule, next: boolean) {
+    setPermissions(prev => {
+      const exists = prev.some(p => p.role === role && p.module === module);
+      return exists ? prev.map(p => (p.role === role && p.module === module ? { ...p, can_access: next } : p)) : [...prev, { role, module, can_access: next }];
+    });
+    try {
+      await setRolePermission(role, module, next);
+    } catch (err) {
+      toast(`Save failed: ${errorMessage(err)}`);
+      setPermissions(prev => prev.map(p => (p.role === role && p.module === module ? { ...p, can_access: !next } : p)));
+    }
+  }
 
   async function save(u: EditUser) {
     setSaving(true);
@@ -56,10 +95,40 @@ export function AdminView({ initialUsers }: { initialUsers: AppUserRow[] }) {
     }
   }
 
+  async function saveMapping(m: NewApproverMapping) {
+    setSavingMapping(true);
+    try {
+      const created = await createApproverMapping(m);
+      setMappings(prev => [...prev, created]);
+      toast('Approver mapping added');
+      setAddingMapping(false);
+    } catch (err) {
+      toast(`Save failed: ${errorMessage(err)}`);
+    } finally {
+      setSavingMapping(false);
+    }
+  }
+
+  async function removeMapping(id: string) {
+    try {
+      await deleteApproverMapping(id);
+      setMappings(prev => prev.filter(m => m.id !== id));
+      toast('Approver mapping removed');
+    } catch (err) {
+      toast(`Delete failed: ${errorMessage(err)}`);
+    }
+  }
+
   return (
     <div className="view-enter">
       <PageHeader title="User Administration" sub="Manage users, roles, and access across the Photiades portal."
-        actions={<button className="btn primary" onClick={() => setEdit({ name: '', email: '', role: 'AP Clerk', dept: 'Finance', status: 'Active', isNew: true })}><I.plus size={16} />Add user</button>} />
+        actions={
+          tab === 'Users'
+            ? <button className="btn primary" onClick={() => setEdit({ name: '', email: '', role: 'AP Clerk', dept: 'Finance', status: 'Active', isNew: true })}><I.plus size={16} />Add user</button>
+            : tab === 'Approver Mapping'
+            ? <button className="btn primary" onClick={() => setAddingMapping(true)}><I.plus size={16} />Add mapping</button>
+            : undefined
+        } />
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 'var(--gap-4)', marginBottom: 'var(--gap-5)' }}>
         <MiniStat label="Total users" value={users.length} sub={`${users.filter(u => u.status === 'Active').length} active`} tone="blue" />
@@ -68,7 +137,7 @@ export function AdminView({ initialUsers }: { initialUsers: AppUserRow[] }) {
       </div>
 
       <div className="tabs" style={{ marginBottom: 'var(--gap-5)' }}>
-        {['Users', 'Roles & Permissions'].map(t => (
+        {['Users', 'Roles & Permissions', 'Approver Mapping'].map(t => (
           <button key={t} className={cx('tab', tab === t && 'on')} onClick={() => setTab(t)}>{t}</button>
         ))}
       </div>
@@ -102,21 +171,86 @@ export function AdminView({ initialUsers }: { initialUsers: AppUserRow[] }) {
             </tbody>
           </table>
         </div>
-      ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 'var(--gap-4)' }}>
-          {rolePerms.map(r => (
-            <div key={r.role} className="card card-pad">
-              <div className="row" style={{ justifyContent: 'space-between', marginBottom: 12 }}>
-                <Badge tone={r.tone}>{r.role}</Badge>
-                <span className="muted" style={{ fontSize: 12 }}><span className="mono">{users.filter(u => u.role === r.role).length}</span> users</span>
+      ) : tab === 'Roles & Permissions' ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--gap-5)' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 'var(--gap-4)' }}>
+            {rolePerms.map(r => (
+              <div key={r.role} className="card card-pad">
+                <div className="row" style={{ justifyContent: 'space-between', marginBottom: 12 }}>
+                  <Badge tone={r.tone}>{r.role}</Badge>
+                  <span className="muted" style={{ fontSize: 12 }}><span className="mono">{users.filter(u => u.role === r.role).length}</span> users</span>
+                </div>
+                <div style={{ fontSize: 13, color: 'var(--text-2)', lineHeight: 1.5 }}>{r.perms}</div>
               </div>
-              <div style={{ fontSize: 13, color: 'var(--text-2)', lineHeight: 1.5 }}>{r.perms}</div>
+            ))}
+          </div>
+
+          <div className="card" style={{ overflow: 'hidden' }}>
+            <div className="card-head">
+              <div className="card-title">Per-module access</div>
+              <span className="faint" style={{ fontSize: 12 }}>Administrator always has full access</span>
             </div>
-          ))}
+            <table className="tbl">
+              <thead>
+                <tr>
+                  <th>Module</th>
+                  {EDITABLE_ROLES.map(r => <th key={r} className="right">{r}</th>)}
+                </tr>
+              </thead>
+              <tbody>
+                {PERMISSION_MODULES.map(mod => (
+                  <tr key={mod.key}>
+                    <td style={{ fontSize: 13 }}>{mod.label}{mod.locked && <span className="faint" style={{ fontSize: 11, marginLeft: 6 }}>(always on)</span>}</td>
+                    {EDITABLE_ROLES.map(role => (
+                      <td key={role} className="right">
+                        <input type="checkbox" disabled={mod.locked}
+                          checked={mod.locked ? true : hasAccess(role, mod.key)}
+                          onChange={e => togglePermission(role, mod.key, e.target.checked)} />
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ) : (
+        <div className="card" style={{ overflow: 'hidden' }}>
+          <table className="tbl">
+            <thead>
+              <tr><th>Task</th><th>Amount range</th><th>Routes to</th><th /></tr>
+            </thead>
+            <tbody>
+              {mappings.map(m => {
+                const task = ASSIGNABLE_TASKS.find(t => t.id === m.task_id);
+                const approverUser = users.find(u => u.id === m.approver_user_id);
+                return (
+                  <tr key={m.id}>
+                    <td style={{ fontSize: 13 }}>{task?.label ?? m.task_id}</td>
+                    <td className="muted" style={{ fontSize: 12.5 }}>
+                      {m.min_amount == null && m.max_amount == null ? 'Any amount'
+                        : m.max_amount == null ? `Above ${fmtMoney(m.min_amount!)}`
+                        : m.min_amount == null ? `Up to ${fmtMoney(m.max_amount)}`
+                        : `${fmtMoney(m.min_amount)} – ${fmtMoney(m.max_amount)}`}
+                    </td>
+                    <td>
+                      <Badge tone={roleTone[m.approver_role]}>{m.approver_role}</Badge>
+                      {approverUser && <span className="muted" style={{ fontSize: 12.5, marginLeft: 8 }}>{approverUser.name}</span>}
+                    </td>
+                    <td style={{ textAlign: 'right' }}>
+                      <button title="Remove" onClick={() => removeMapping(m.id)} style={{ border: 'none', background: 'none', color: 'var(--faint)', display: 'grid', placeItems: 'center', padding: 6, borderRadius: 6, cursor: 'pointer' }}><I.trash size={14} /></button>
+                    </td>
+                  </tr>
+                );
+              })}
+              {mappings.length === 0 && <tr><td colSpan={4} className="faint" style={{ padding: 20, textAlign: 'center' }}>No approver mappings configured — tasks fall back to their default role.</td></tr>}
+            </tbody>
+          </table>
         </div>
       )}
 
       {edit && <UserModal user={edit} saving={saving} onClose={() => setEdit(null)} onSave={save} />}
+      {addingMapping && <ApproverMappingModal users={users} saving={savingMapping} onClose={() => setAddingMapping(false)} onSave={saveMapping} />}
     </div>
   );
 }
@@ -153,6 +287,60 @@ function UserModal({ user, saving, onClose, onSave }: { user: EditUser; saving: 
         </div>
         <div className="field"><label>Status</label>
           <Segmented options={['Active', 'Inactive']} value={form.status ?? ''} onChange={(v) => set('status', String(v))} />
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+function ApproverMappingModal({ users, saving, onClose, onSave }: {
+  users: AppUserRow[]; saving: boolean; onClose: () => void; onSave: (m: NewApproverMapping) => void;
+}) {
+  const [taskId, setTaskId] = useState(ASSIGNABLE_TASKS[0]?.id ?? '');
+  const [minAmount, setMinAmount] = useState('');
+  const [maxAmount, setMaxAmount] = useState('');
+  const [role, setRole] = useState<AppUserRow['role']>('Approver');
+  const [approverUserId, setApproverUserId] = useState('');
+
+  const eligibleUsers = users.filter(u => u.role === role && u.status === 'Active');
+
+  return (
+    <Modal title="Add approver mapping" sub="Route a task to a role or specific approver when the invoice amount matches"
+      onClose={onClose}
+      footer={<>
+        <button className="btn" onClick={onClose}>Cancel</button>
+        <button className="btn primary" disabled={!taskId || saving} onClick={() => onSave({
+          task_id: taskId,
+          min_amount: minAmount ? Number(minAmount) : null,
+          max_amount: maxAmount ? Number(maxAmount) : null,
+          approver_role: role,
+          approver_user_id: approverUserId || null,
+        })}>{saving ? 'Saving…' : 'Add mapping'}</button>
+      </>}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <div className="field"><label>Task</label>
+          <select className="input" value={taskId} onChange={e => setTaskId(e.target.value)}>
+            {ASSIGNABLE_TASKS.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
+          </select>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+          <div className="field"><label>Min amount (optional)</label>
+            <input className="input" type="number" value={minAmount} onChange={e => setMinAmount(e.target.value)} placeholder="No lower bound" />
+          </div>
+          <div className="field"><label>Max amount (optional)</label>
+            <input className="input" type="number" value={maxAmount} onChange={e => setMaxAmount(e.target.value)} placeholder="No upper bound" />
+          </div>
+        </div>
+        <div className="field"><label>Route to role</label>
+          <select className="input" value={role} onChange={e => { setRole(e.target.value as AppUserRow['role']); setApproverUserId(''); }}>
+            {ROLES.map(r => <option key={r}>{r}</option>)}
+          </select>
+        </div>
+        <div className="field"><label>Specific approver (optional)</label>
+          <select className="input" value={approverUserId} onChange={e => setApproverUserId(e.target.value)}>
+            <option value="">Anyone with this role</option>
+            {eligibleUsers.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+          </select>
         </div>
       </div>
     </Modal>

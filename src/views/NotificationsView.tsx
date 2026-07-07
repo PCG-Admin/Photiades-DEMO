@@ -7,8 +7,10 @@ import { I } from '@/components/icons';
 import { Badge, PageHeader, MiniStat, Segmented } from '@/components/ui';
 import { RelativeTime } from '@/components/RelativeTime';
 import { useToast } from '@/components/providers/ToastProvider';
+import { useGo } from '@/lib/navigation';
 import { TONE_VAR, SOFT_VAR } from '@/lib/utils';
-import { markNotificationRead } from '@/lib/server/notifications';
+import { markNotificationRead, resolveNotificationTarget } from '@/lib/server/notifications';
+import { errorMessage } from '@/lib/errorMessage';
 import type { NotificationRow } from '@/lib/supabase/types';
 
 const KIND_LABEL: Record<NotificationRow['kind'], string> = {
@@ -17,16 +19,28 @@ const KIND_LABEL: Record<NotificationRow['kind'], string> = {
 
 export function NotificationsView({ initialNotifications }: { initialNotifications: NotificationRow[] }) {
   const toast = useToast();
+  const go = useGo();
   const [items, setItems] = useState<NotificationRow[]>(initialNotifications);
   const [filter, setFilter] = useState('Unread');
 
   const unreadCount = items.filter(n => !n.read).length;
   const filtered = filter === 'Unread' ? items.filter(n => !n.read) : items;
 
-  async function markRead(n: NotificationRow) {
-    if (n.read) return;
-    setItems(prev => prev.map(x => x.id === n.id ? { ...x, read: true } : x));
-    await markNotificationRead(n.id);
+  // Clicking a notification used to only mark it read — it never took you
+  // anywhere, even though task/declined notifications carry a
+  // ref_invoice_id/ref_instance_id pointing at exactly what needs review.
+  async function openNotification(n: NotificationRow) {
+    if (!n.read) {
+      setItems(prev => prev.map(x => x.id === n.id ? { ...x, read: true } : x));
+      await markNotificationRead(n.id);
+    }
+    if (!n.ref_invoice_id && !n.ref_instance_id) return;
+    try {
+      const target = await resolveNotificationTarget(n);
+      if (target) go(target.view, target.code);
+    } catch (err) {
+      toast(`Couldn't open: ${errorMessage(err)}`);
+    }
   }
 
   async function markAllRead() {
@@ -57,11 +71,11 @@ export function NotificationsView({ initialNotifications }: { initialNotificatio
             const Ico = (n.icon && I[n.icon]) || I.bell;
             const tone = n.tone ?? 'gray';
             return (
-              <button key={n.id} onClick={() => markRead(n)}
+              <button key={n.id} onClick={() => openNotification(n)}
                 style={{
                   display: 'flex', alignItems: 'flex-start', gap: 14, width: '100%', textAlign: 'left', border: 'none',
                   borderBottom: '1px solid var(--border)', background: n.read ? 'transparent' : 'var(--accent-softer)',
-                  padding: '14px 20px', cursor: 'pointer',
+                  padding: '14px 20px', cursor: (n.ref_invoice_id || n.ref_instance_id) ? 'pointer' : 'default',
                 }}>
                 <div style={{
                   width: 32, height: 32, borderRadius: 99, flexShrink: 0, display: 'grid', placeItems: 'center',

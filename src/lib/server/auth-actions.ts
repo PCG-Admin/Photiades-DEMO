@@ -3,6 +3,7 @@
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { errorMessage } from '@/lib/errorMessage';
+import { recordAuditEvent } from '@/lib/server/audit';
 
 export interface LoginState {
   error?: string;
@@ -18,11 +19,19 @@ export async function login(_prev: LoginState, formData: FormData): Promise<Logi
     return { error: error.message === 'Invalid login credentials' ? 'Invalid email or password.' : errorMessage(error) };
   }
 
+  // T172 — access log: login history. Session cookies are already set by
+  // signInWithPassword above, so recordAuditEvent's getCurrentAppUser() call
+  // resolves the user who just signed in.
+  await recordAuditEvent({ action: 'Signed in', module: 'Auth', icon: 'logout', tone: 'green' });
+
   redirect('/dashboard');
 }
 
 export async function logout() {
   const supabase = await createClient();
+  // Recorded before signOut() clears the session — recordAuditEvent needs
+  // the still-active session to know who's signing out.
+  await recordAuditEvent({ action: 'Signed out', module: 'Auth', icon: 'logout', tone: 'gray' });
   await supabase.auth.signOut();
   redirect('/login');
 }

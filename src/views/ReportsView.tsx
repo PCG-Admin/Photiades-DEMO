@@ -6,6 +6,7 @@ import { Badge, MiniStat, PageHeader } from '@/components/ui';
 import { fmtMoney, cx } from '@/lib/utils';
 import { fmtDate } from '@/lib/format';
 import { downloadCsv } from '@/lib/csv';
+import { downloadXlsx } from '@/lib/xlsx';
 import {
   getInvoiceAging, getApprovalSLA, getApproverPerformance, getDeclinedTrend, getPendingPayments, exportInvoices,
   type AgingBucket, type SlaRow, type ApproverPerformanceRow, type DeclinedRow, type InvoiceExportFilters,
@@ -51,8 +52,9 @@ export function ReportsView() {
   );
 }
 
-function ReportCard({ title, sub, icon, loading, onExport, children }: {
-  title: string; sub: string; icon: IconComponent; loading: boolean; onExport?: () => void; children: React.ReactNode;
+function ReportCard({ title, sub, icon, loading, exportData, exportFilename, children }: {
+  title: string; sub: string; icon: IconComponent; loading: boolean;
+  exportData?: Record<string, unknown>[]; exportFilename?: string; children: React.ReactNode;
 }) {
   const Ico = icon;
   return (
@@ -62,11 +64,20 @@ function ReportCard({ title, sub, icon, loading, onExport, children }: {
           <div style={{ width: 34, height: 34, borderRadius: 9, background: 'var(--accent-soft)', color: 'var(--accent-strong)', display: 'grid', placeItems: 'center', flexShrink: 0 }}><Ico size={17} /></div>
           <div><div className="card-title">{title}</div><div className="card-sub">{sub}</div></div>
         </div>
-        {onExport && <button className="btn" onClick={onExport}><I.download size={15} />Export CSV</button>}
+        {exportData && exportFilename && <ExportButtons data={exportData} filename={exportFilename} />}
       </div>
       <div className="card-pad">
         {loading ? <div className="empty"><I.reports size={28} /><div style={{ marginTop: 8 }}>Loading…</div></div> : children}
       </div>
+    </div>
+  );
+}
+
+export function ExportButtons({ data, filename }: { data: Record<string, unknown>[]; filename: string }) {
+  return (
+    <div className="row" style={{ gap: 6 }}>
+      <button className="btn" onClick={() => downloadXlsx(`${filename}.xlsx`, data)}><I.download size={15} />Excel</button>
+      <button className="btn" onClick={() => downloadCsv(`${filename}.csv`, data)}><I.download size={15} />CSV</button>
     </div>
   );
 }
@@ -128,7 +139,7 @@ function InvoiceAgingReport() {
         </div>
       )}
       <ReportCard title="Invoice Aging" sub="Outstanding invoices by days-since-due" icon={I.calendar} loading={!data}
-        onExport={data ? () => downloadCsv('invoice-aging.csv', data.map(b => ({ bucket: b.label, count: b.count, total: b.total }))) : undefined}>
+        exportData={data?.map(b => ({ bucket: b.label, count: b.count, total: b.total }))} exportFilename="invoice-aging">
         {data && (
           data.every(b => b.count === 0) ? <div className="faint" style={{ fontSize: 13 }}>No outstanding invoices.</div> : (
             <>
@@ -160,7 +171,7 @@ function ApprovalSlaReport() {
 
   return (
     <ReportCard title="Approval SLA" sub="Average time spent at each workflow task" icon={I.clock} loading={!data}
-      onExport={data ? () => downloadCsv('approval-sla.csv', data.map(r => ({ task: r.taskName, avg_hours: r.avgHours.toFixed(1), decisions: r.count }))) : undefined}>
+      exportData={data?.map(r => ({ task: r.taskName, avg_hours: r.avgHours.toFixed(1), decisions: r.count }))} exportFilename="approval-sla">
       {data && (
         data.length === 0 ? <div className="faint" style={{ fontSize: 13 }}>No completed task transitions yet.</div> : (
           <>
@@ -191,7 +202,7 @@ function ApproverPerformanceReport() {
 
   return (
     <ReportCard title="Approver Performance" sub="Volume and turnaround per approver" icon={I.users} loading={!data}
-      onExport={data ? () => downloadCsv('approver-performance.csv', data.map(r => ({ approver: r.actorName, actions: r.actions, avg_turnaround_hours: r.avgTurnaroundHours?.toFixed(1) ?? '' }))) : undefined}>
+      exportData={data?.map(r => ({ approver: r.actorName, actions: r.actions, avg_turnaround_hours: r.avgTurnaroundHours?.toFixed(1) ?? '' }))} exportFilename="approver-performance">
       {data && (
         data.length === 0 ? <div className="faint" style={{ fontSize: 13 }}>No workflow actions recorded yet.</div> : (
           <>
@@ -230,7 +241,7 @@ function DeclinedInvoicesReport() {
         </div>
       )}
       <ReportCard title="Declined Invoices" sub="Every decline, with the task and reason recorded" icon={I.x} loading={!data}
-        onExport={data ? () => downloadCsv('declined-invoices.csv', data.map(r => ({ invoice: r.code, vendor: r.vendor, amount: r.amount, task: r.taskName, reason: r.reason, when: r.when }))) : undefined}>
+        exportData={data?.map(r => ({ invoice: r.code, vendor: r.vendor, amount: r.amount, task: r.taskName, reason: r.reason, when: r.when }))} exportFilename="declined-invoices">
         {data && (
           data.length === 0 ? <div className="faint" style={{ fontSize: 13 }}>No declined invoices yet.</div> : (
             <table className="tbl">
@@ -270,7 +281,7 @@ function PendingPaymentsReport() {
         </div>
       )}
       <ReportCard title="Pending Payments" sub="Invoices approved and held for the next payment run" icon={I.building} loading={!data}
-        onExport={data ? () => downloadCsv('pending-payments.csv', data.map(r => ({ invoice: r.code, vendor: r.vendor, amount: r.total, due: r.due_at }))) : undefined}>
+        exportData={data?.map(r => ({ invoice: r.code, vendor: r.vendor, amount: r.total, due: r.due_at }))} exportFilename="pending-payments">
         {data && (
           data.length === 0 ? <div className="faint" style={{ fontSize: 13 }}>No invoices pending payment.</div> : (
             <table className="tbl">
@@ -346,11 +357,11 @@ function CustomExportReport() {
         {rows && (
           <div className="row" style={{ justifyContent: 'space-between', paddingTop: 6, borderTop: '1px solid var(--border)' }}>
             <span className="muted" style={{ fontSize: 13 }}><span className="mono" style={{ fontWeight: 600 }}>{rows.length}</span> invoices match</span>
-            <button className="btn" onClick={() => downloadCsv('invoices-export.csv', rows.map(r => {
+            <ExportButtons filename="invoices-export" data={rows.map(r => {
               const out: Record<string, unknown> = {};
               allFields.filter(f => fields[f]).forEach(f => { out[f] = r[f]; });
               return out;
-            }))}><I.download size={15} />Export CSV</button>
+            })} />
           </div>
         )}
       </div>

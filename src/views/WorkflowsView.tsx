@@ -18,6 +18,7 @@ import {
 } from '@/lib/server/workflows';
 import { listAppUsers } from '@/lib/server/users';
 import { errorMessage } from '@/lib/errorMessage';
+import { useTr } from '@/lib/i18n';
 
 type Invoice = { invNo: string; po: string | null; amount: number };
 
@@ -29,6 +30,7 @@ function fieldsOf(fields: unknown): Record<string, unknown> {
 
 // =================== WORKFLOWS LIST ===================
 export function WorkflowsView({ initialInstances, initialOpen = null }: { initialInstances: WorkflowInstanceListItem[]; initialOpen?: string | null }) {
+  const tr = useTr();
   const toast = useToast();
   const go = useGo();
   const [instances, setInstances] = useState<WorkflowInstanceListItem[]>(initialInstances);
@@ -53,8 +55,8 @@ export function WorkflowsView({ initialInstances, initialOpen = null }: { initia
 
   return (
     <div className="view-enter">
-      <PageHeader title="Workflows" sub="Invoice approval workflows — track and action in-flight items."
-        actions={<button className="btn"><I.settings size={15} />Workflow designer</button>} />
+      <PageHeader title={tr('Workflows')} sub={tr('Invoice approval workflows — track and action in-flight items.')}
+        actions={<button className="btn"><I.settings size={15} />{tr('Workflow designer')}</button>} />
 
       {/* Workflow switcher */}
       <div style={{ marginBottom: 'var(--gap-5)' }}>
@@ -62,17 +64,17 @@ export function WorkflowsView({ initialInstances, initialOpen = null }: { initia
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 'var(--gap-4)', marginBottom: 'var(--gap-5)' }}>
-        <MiniStat label="Active workflows" value={active.length} sub="in progress" tone="blue" />
-        <MiniStat label="In approval" value={wfInstances.filter(i => i.instance.status === 'In Progress' && i.instance.task_idx > 0).length} tone="violet" />
-        <MiniStat label="Info requested" value={wfInstances.filter(i => i.instance.status === 'Info Requested').length} tone="amber" />
-        <MiniStat label="Total value in flight" value={fmtMoney(active.reduce((s, i) => s + i.amount, 0))} tone="green" />
+        <MiniStat label={tr('Active workflows')} value={active.length} sub={tr('in progress')} tone="blue" />
+        <MiniStat label={tr('In approval')} value={wfInstances.filter(i => i.instance.status === 'In Progress' && i.instance.task_idx > 0).length} tone="violet" />
+        <MiniStat label={tr('Info requested')} value={wfInstances.filter(i => i.instance.status === 'Info Requested').length} tone="amber" />
+        <MiniStat label={tr('Total value in flight')} value={fmtMoney(active.reduce((s, i) => s + i.amount, 0))} tone="green" />
       </div>
 
       {/* Workflow definition strip */}
       <div className="card" style={{ marginBottom: 'var(--gap-5)', padding: '16px 20px' }}>
         <div className="row" style={{ justifyContent: 'space-between', marginBottom: 14 }}>
           <div className="card-title">{wf.name}</div>
-          <Badge tone="blue" dot>{tasks.filter(t => !t.auto).length} tasks</Badge>
+          <Badge tone="blue" dot>{tasks.filter(t => !t.auto).length} {tr('tasks')}</Badge>
         </div>
         <div className="row" style={{ gap: 0, flexWrap: 'wrap', rowGap: 8 }}>
           {tasks.map((t, i) => (
@@ -90,25 +92,25 @@ export function WorkflowsView({ initialInstances, initialOpen = null }: { initia
         </div>
         {branch && (
           <div className="row" style={{ gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
-            <span className="faint" style={{ fontSize: 11.5 }}>Amount check branch:</span>
+            <span className="faint" style={{ fontSize: 11.5 }}>{tr('Amount check branch:')}</span>
             <Badge tone="teal">&gt; €{branch.threshold} → {branch.over}</Badge>
-            <Badge tone="gray">≤ €{branch.threshold} → {branch.under} (skips {tasks[branch.skipIdx].name})</Badge>
+            <Badge tone="gray">≤ €{branch.threshold} → {branch.under} ({tr('skips')} {tasks[branch.skipIdx].name})</Badge>
           </div>
         )}
       </div>
 
       <div className="card" style={{ overflow: 'hidden' }}>
-        <div className="card-head"><div className="card-title">In-flight workflows</div><Badge tone="gray">{wfInstances.length}</Badge></div>
+        <div className="card-head"><div className="card-title">{tr('In-flight workflows')}</div><Badge tone="gray">{wfInstances.length}</Badge></div>
         <table className="tbl">
           <thead>
-            <tr><th>Workflow</th><th>Vendor</th><th className="right">Amount</th><th>Current task</th><th>Status</th><th>Started</th><th style={{ width: 40 }}></th></tr>
+            <tr><th>{tr('Workflow')}</th><th>{tr('Vendor')}</th><th className="right">{tr('Amount')}</th><th>{tr('Current task')}</th><th>{tr('Status')}</th><th>{tr('Started')}</th><th style={{ width: 40 }}></th></tr>
           </thead>
           <tbody>
             {wfInstances.map(({ instance: inst, invoiceCode, vendor, po, amount }) => (
               <tr key={inst.id} className="clickable" onClick={() => setOpen(inst.code)}>
                 <td>
                   <div className="mono" style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--accent-strong)' }}>{inst.code}</div>
-                  <div className="faint mono" style={{ fontSize: 11 }}>{invoiceCode} · {po || 'No PO'}</div>
+                  <div className="faint mono" style={{ fontSize: 11 }}>{invoiceCode} · {po || tr('No PO')}</div>
                 </td>
                 <td style={{ fontWeight: 500, fontSize: 13 }}>{vendor}</td>
                 <td className="right num" style={{ fontWeight: 600 }}>{fmtMoney(amount)}</td>
@@ -121,13 +123,13 @@ export function WorkflowsView({ initialInstances, initialOpen = null }: { initia
                     </div>
                   </div>
                 </td>
-                <td><Badge tone={statusTone[inst.status]} dot>{inst.status}</Badge></td>
+                <td><Badge tone={statusTone[inst.status]} dot>{tr(inst.status)}</Badge></td>
                 <td className="faint" style={{ fontSize: 12 }}><RelativeTime date={new Date(inst.started_at)} /></td>
                 <td><I.chevR size={16} style={{ color: 'var(--faint)' }} /></td>
               </tr>
             ))}
             {wfInstances.length === 0 && (
-              <tr><td colSpan={7} className="faint" style={{ padding: 20, textAlign: 'center', fontSize: 13 }}>No {wf.name.toLowerCase()} instances yet</td></tr>
+              <tr><td colSpan={7} className="faint" style={{ padding: 20, textAlign: 'center', fontSize: 13 }}>{tr('No instances yet')}</td></tr>
             )}
           </tbody>
         </table>
@@ -144,6 +146,7 @@ function WorkflowRunner({ code, onBack, toast, go, onUpdate }: {
   go: ReturnType<typeof useGo>;
   onUpdate: (patch: Partial<WorkflowInstanceDetail>) => void;
 }) {
+  const tr = useTr();
   const [detail, setDetail] = useState<WorkflowInstanceDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [selAction, setSelAction] = useState<string | null>(null);
@@ -172,8 +175,8 @@ function WorkflowRunner({ code, onBack, toast, go, onUpdate }: {
   if (loading || !detail) {
     return (
       <div className="view-enter">
-        <button className="btn ghost sm" onClick={onBack}><I.chevL size={16} />Workflows</button>
-        <div className="empty" style={{ marginTop: 40 }}><I.zap size={32} /><div style={{ marginTop: 10 }}>Loading workflow…</div></div>
+        <button className="btn ghost sm" onClick={onBack}><I.chevL size={16} />{tr('Workflows')}</button>
+        <div className="empty" style={{ marginTop: 40 }}><I.zap size={32} /><div style={{ marginTop: 10 }}>{tr('Loading workflow…')}</div></div>
       </div>
     );
   }
@@ -225,24 +228,24 @@ function WorkflowRunner({ code, onBack, toast, go, onUpdate }: {
   return (
     <div className="view-enter">
       <div className="row" style={{ gap: 14, marginBottom: 'var(--gap-5)', flexWrap: 'wrap' }}>
-        <button className="btn ghost sm" onClick={onBack}><I.chevL size={16} />Workflows</button>
+        <button className="btn ghost sm" onClick={onBack}><I.chevL size={16} />{tr('Workflows')}</button>
         <div>
           <div className="row" style={{ gap: 10 }}>
             <h2 style={{ margin: 0, fontSize: 19, fontWeight: 600 }} className="mono">{detail.code}</h2>
-            <Badge tone={statusTone[detail.status]} dot>{detail.status}</Badge>
+            <Badge tone={statusTone[detail.status]} dot>{tr(detail.status)}</Badge>
           </div>
           <div className="muted" style={{ fontSize: 13, marginTop: 3 }}>{wf.name} · {detail.vendor}</div>
         </div>
         <div className="spacer" />
-        <button className="btn" onClick={() => go('invoices', detail.invoiceCode)}><I.invoice size={15} />View invoice</button>
+        <button className="btn" onClick={() => go('invoices', detail.invoiceCode)}><I.invoice size={15} />{tr('View invoice')}</button>
       </div>
 
       {/* facts bar */}
       <div className="card" style={{ display: 'flex', gap: 0, marginBottom: 'var(--gap-5)', overflow: 'hidden' }}>
         {[
-          { l: 'Invoice', v: detail.invoiceCode, mono: true },
-          { l: 'PO Number', v: detail.po || 'No PO', mono: true },
-          { l: 'Amount', v: fmtMoney(detail.amount), mono: true, big: true },
+          { l: tr('Invoice'), v: detail.invoiceCode, mono: true },
+          { l: tr('PO Number'), v: detail.po || tr('No PO'), mono: true },
+          { l: tr('Amount'), v: fmtMoney(detail.amount), mono: true, big: true },
         ].map((f, i) => (
           <div key={f.l} style={{ flex: 1, padding: '14px 20px', borderRight: i < 2 ? '1px solid var(--border)' : 'none' }}>
             <div className="muted" style={{ fontSize: 11 }}>{f.l}</div>
@@ -254,7 +257,7 @@ function WorkflowRunner({ code, onBack, toast, go, onUpdate }: {
       <div style={{ display: 'grid', gridTemplateColumns: '320px 1fr', gap: 'var(--gap-5)', alignItems: 'start' }}>
         {/* Task timeline */}
         <div className="card" style={{ position: 'sticky', top: 0 }}>
-          <div className="card-head"><div className="card-title">Workflow tasks</div></div>
+          <div className="card-head"><div className="card-title">{tr('Workflow tasks')}</div></div>
           <div className="card-pad">
             <WFTimeline tasks={tasks} taskIdx={detail.task_idx} terminal={terminal} isComplete={isComplete} isPendingPmt={isPendingPmt} additionalPending={additionalPending} amount={detail.amount} branch={branch} />
           </div>
@@ -281,9 +284,9 @@ function WorkflowRunner({ code, onBack, toast, go, onUpdate }: {
 
           {/* History */}
           <div className="card">
-            <div className="card-head"><div className="card-title">Workflow history</div><Badge tone="gray">{detail.history.length}</Badge></div>
+            <div className="card-head"><div className="card-title">{tr('Workflow history')}</div><Badge tone="gray">{detail.history.length}</Badge></div>
             <div style={{ padding: '8px 0' }}>
-              {detail.history.length === 0 && <div className="faint" style={{ fontSize: 12.5, padding: '10px 20px' }}>No actions yet</div>}
+              {detail.history.length === 0 && <div className="faint" style={{ fontSize: 12.5, padding: '10px 20px' }}>{tr('No actions yet')}</div>}
               {detail.history.map((h, i) => {
                 const action = tasks.find(t => t.id === h.task_id)?.actions?.find(a => a.key === h.action_key);
                 const tone = action?.tone ?? (h.action_key.includes('Grant') ? 'green' : h.action_key.includes('Decline') ? 'red' : 'gray');
@@ -317,6 +320,7 @@ function WFTimeline({ tasks, taskIdx, terminal, isComplete, isPendingPmt, additi
   amount: number;
   branch?: WFBranch;
 }) {
+  const tr = useTr();
   const finished = isComplete || isPendingPmt;
   const branchIdx = branch ? tasks.findIndex(t => t.auto) : -1;
   const lowValueRouted = branch != null && amount <= branch.threshold && (taskIdx > branchIdx || finished || terminal);
@@ -344,12 +348,12 @@ function WFTimeline({ tasks, taskIdx, terminal, isComplete, isPendingPmt, additi
             <div style={{ paddingBottom: last ? 0 : 22, flex: 1 }}>
               <div style={{ fontSize: 13.5, fontWeight: 600 }}>{t.name}</div>
               <div className="faint" style={{ fontSize: 11.5, marginBottom: 6 }}>{t.role}</div>
-              {skipped && <Badge tone="gray">Skipped · ≤ €{branch!.threshold}</Badge>}
-              {!skipped && active && additionalPending && <Badge tone="violet" dot>Awaiting additional approval</Badge>}
-              {!skipped && active && !additionalPending && <Badge tone="blue" dot>Current</Badge>}
-              {!skipped && done && <Badge tone="green">Done</Badge>}
-              {last && isComplete && <div style={{ marginTop: 6 }}><Badge tone="green" dot>Workflow complete</Badge></div>}
-              {last && isPendingPmt && <div style={{ marginTop: 6 }}><Badge tone="teal" dot>Pending payment</Badge></div>}
+              {skipped && <Badge tone="gray">{tr('Skipped')} · ≤ €{branch!.threshold}</Badge>}
+              {!skipped && active && additionalPending && <Badge tone="violet" dot>{tr('Awaiting additional approval')}</Badge>}
+              {!skipped && active && !additionalPending && <Badge tone="blue" dot>{tr('Current')}</Badge>}
+              {!skipped && done && <Badge tone="green">{tr('Done')}</Badge>}
+              {last && isComplete && <div style={{ marginTop: 6 }}><Badge tone="green" dot>{tr('Workflow complete')}</Badge></div>}
+              {last && isPendingPmt && <div style={{ marginTop: 6 }}><Badge tone="teal" dot>{tr('Pending payment')}</Badge></div>}
             </div>
           </div>
         );
@@ -371,6 +375,7 @@ function ActiveTaskCard({ task, taskIdx, selAction, onSelect, form, setField, in
   onSubmit: () => void;
   onCancel: () => void;
 }) {
+  const tr = useTr();
   const action = task.actions!.find(a => a.key === selAction);
   return (
     <div className="card">
@@ -385,7 +390,7 @@ function ActiveTaskCard({ task, taskIdx, selAction, onSelect, form, setField, in
         <Badge tone="blue">{task.role}</Badge>
       </div>
       <div className="card-pad">
-        <div style={{ fontSize: 12, fontWeight: 600, letterSpacing: '0.04em', textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 11 }}>Choose an action</div>
+        <div style={{ fontSize: 12, fontWeight: 600, letterSpacing: '0.04em', textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 11 }}>{tr('Choose an action')}</div>
         <div className="row" style={{ gap: 9, flexWrap: 'wrap', marginBottom: selAction ? 22 : 0 }}>
           {task.actions!.map(a => {
             const Ico = I[a.icon] || I.check;
@@ -413,9 +418,9 @@ function ActiveTaskCard({ task, taskIdx, selAction, onSelect, form, setField, in
               ))}
             </div>
             <div className="row" style={{ gap: 10, marginTop: 22, justifyContent: 'flex-end' }}>
-              <button className="btn" onClick={onCancel} disabled={submitting}>Cancel</button>
+              <button className="btn" onClick={onCancel} disabled={submitting}>{tr('Cancel')}</button>
               <button className="btn" style={{ background: ACTION_TONE_VAR(action.tone), color: 'white', borderColor: 'transparent' }} onClick={onSubmit} disabled={submitting}>
-                <I.send size={15} />{submitting ? 'Submitting…' : `Submit · ${action.label}`}
+                <I.send size={15} />{submitting ? tr('Submitting…') : `${tr('Submit')} · ${action.label}`}
               </button>
             </div>
           </div>
@@ -432,6 +437,7 @@ function WFFieldEl({ f, value, onChange, invoice, approvers }: {
   invoice: Invoice;
   approvers: string[];
 }) {
+  const tr = useTr();
   const full = ['textarea'].includes(f.type) || f.k === 'approver';
   const isRO = f.type === 'ro' || f.type === 'ro-currency';
   const displayRO = f.type === 'ro-currency' ? fmtMoney(invoice[f.src as keyof Invoice] as number) : invoice[f.src as keyof Invoice];
@@ -440,7 +446,7 @@ function WFFieldEl({ f, value, onChange, invoice, approvers }: {
     <div style={{ gridColumn: full ? '1 / -1' : 'auto' }}>
       <label style={{ fontSize: 11.5, fontWeight: 500, color: 'var(--text-2)', display: 'block', marginBottom: 6 }}>
         {f.label}{f.required && <span style={{ color: 'var(--red)' }}> *</span>}
-        {isRO && <span className="faint" style={{ fontWeight: 400 }}> · from invoice</span>}
+        {isRO && <span className="faint" style={{ fontWeight: 400 }}> · {tr('from invoice')}</span>}
       </label>
       {isRO ? (
         <div className="input mono" style={{ background: 'var(--surface-2)', color: 'var(--text-2)', cursor: 'not-allowed', display: 'flex', alignItems: 'center', gap: 7 }}>
@@ -448,11 +454,11 @@ function WFFieldEl({ f, value, onChange, invoice, approvers }: {
         </div>
       ) : f.type === 'textarea' ? (
         <textarea className="input" rows={2} value={value || ''} onChange={e => onChange(e.target.value)}
-          placeholder="Enter comment…" style={{ resize: 'vertical', fontFamily: 'var(--font)' }} />
+          placeholder={tr('Enter comment…')} style={{ resize: 'vertical', fontFamily: 'var(--font)' }} />
       ) : f.type === 'select' ? (
         <select className="input" value={value || ''} onChange={e => onChange(e.target.value)}>
-          <option value="">— Select —</option>
-          {options?.map(o => <option key={o}>{o}</option>)}
+          <option value="">{tr('— Select —')}</option>
+          {options?.map(o => <option key={o} value={o}>{o}</option>)}
         </select>
       ) : f.type === 'currency' ? (
         <div style={{ position: 'relative' }}>
@@ -467,6 +473,7 @@ function WFFieldEl({ f, value, onChange, invoice, approvers }: {
 }
 
 function AmountCheckCard({ amount, branch, submitting, onConfirm }: { amount: number; branch?: WFBranch; submitting: boolean; onConfirm: () => void }) {
+  const tr = useTr();
   const threshold = branch?.threshold ?? 500;
   const over = amount > threshold;
   const dest = over ? (branch?.over ?? 'PurchMgr-Approval') : (branch?.under ?? 'AM - AcDep-Review');
@@ -474,20 +481,20 @@ function AmountCheckCard({ amount, branch, submitting, onConfirm }: { amount: nu
     <div className="card">
       <div className="card-head">
         <div>
-          <div className="card-title">Amount check</div>
-          <div className="card-sub" style={{ marginTop: 6 }}>Automatic threshold check determines the next approver.</div>
+          <div className="card-title">{tr('Amount check')}</div>
+          <div className="card-sub" style={{ marginTop: 6 }}>{tr('Automatic threshold check determines the next approver.')}</div>
         </div>
-        <Badge tone="violet" dot>System</Badge>
+        <Badge tone="violet" dot>{tr('System')}</Badge>
       </div>
       <div className="card-pad">
         <div className="row" style={{ gap: 16, marginBottom: 20 }}>
           <div style={{ flex: 1, padding: 16, borderRadius: 10, background: 'var(--surface-2)', border: '1px solid var(--border)', textAlign: 'center' }}>
-            <div className="muted" style={{ fontSize: 11.5 }}>Invoice amount</div>
+            <div className="muted" style={{ fontSize: 11.5 }}>{tr('Invoice amount')}</div>
             <div className="mono" style={{ fontSize: 24, fontWeight: 700, marginTop: 4 }}>{fmtMoney(amount)}</div>
           </div>
           <div style={{ fontSize: 20, color: 'var(--faint)', fontWeight: 600 }}>{over ? '>' : '≤'}</div>
           <div style={{ flex: 1, padding: 16, borderRadius: 10, background: 'var(--surface-2)', border: '1px solid var(--border)', textAlign: 'center' }}>
-            <div className="muted" style={{ fontSize: 11.5 }}>Threshold</div>
+            <div className="muted" style={{ fontSize: 11.5 }}>{tr('Threshold')}</div>
             <div className="mono" style={{ fontSize: 24, fontWeight: 700, marginTop: 4 }}>{fmtMoney(threshold)}</div>
           </div>
         </div>
@@ -495,12 +502,12 @@ function AmountCheckCard({ amount, branch, submitting, onConfirm }: { amount: nu
         <div className="card" style={{ padding: '12px 16px', background: 'var(--accent-softer)', border: '1px solid var(--accent-soft)', marginBottom: 18 }}>
           <div className="row" style={{ gap: 10 }}>
             <I.zap size={17} style={{ color: 'var(--accent)' }} />
-            <span style={{ fontSize: 13 }}>This invoice will route to <strong>{dest}</strong>.</span>
+            <span style={{ fontSize: 13 }}>{tr('This invoice will route to')} <strong>{dest}</strong>.</span>
           </div>
         </div>
 
         <div className="row" style={{ justifyContent: 'flex-end' }}>
-          <button className="btn primary" onClick={onConfirm} disabled={submitting}><I.arrowR size={15} />{submitting ? 'Routing…' : `Route to ${dest}`}</button>
+          <button className="btn primary" onClick={onConfirm} disabled={submitting}><I.arrowR size={15} />{submitting ? tr('Routing…') : `${tr('Route to')} ${dest}`}</button>
         </div>
       </div>
     </div>
@@ -513,23 +520,24 @@ function AdditionalCard({ approver, invoice, submitting, onResolve }: {
   submitting: boolean;
   onResolve: (approve: boolean) => void;
 }) {
+  const tr = useTr();
   return (
     <div className="card">
       <div className="card-head">
-        <div className="card-title">Additional approval pending</div>
-        <Badge tone="violet" dot>Awaiting {approver.split(' ')[0]}</Badge>
+        <div className="card-title">{tr('Additional approval pending')}</div>
+        <Badge tone="violet" dot>{tr('Awaiting')} {approver.split(' ')[0]}</Badge>
       </div>
       <div className="card-pad">
         <div className="row" style={{ gap: 12, marginBottom: 18 }}>
           <Avatar name={approver} size={40} />
           <div>
             <div style={{ fontWeight: 600, fontSize: 14 }}>{approver}</div>
-            <div className="muted" style={{ fontSize: 12.5 }}>Requested to provide additional approval for {fmtMoney(invoice.amount)}</div>
+            <div className="muted" style={{ fontSize: 12.5 }}>{tr('Requested to provide additional approval for')} {fmtMoney(invoice.amount)}</div>
           </div>
         </div>
         <div className="row" style={{ gap: 10, justifyContent: 'flex-end' }}>
-          <button className="btn danger" onClick={() => onResolve(false)} disabled={submitting}><I.x size={15} />Decline</button>
-          <button className="btn success" onClick={() => onResolve(true)} disabled={submitting}><I.check size={15} />Grant approval</button>
+          <button className="btn danger" onClick={() => onResolve(false)} disabled={submitting}><I.x size={15} />{tr('Decline')}</button>
+          <button className="btn success" onClick={() => onResolve(true)} disabled={submitting}><I.check size={15} />{tr('Grant approval')}</button>
         </div>
       </div>
     </div>
@@ -537,43 +545,46 @@ function AdditionalCard({ approver, invoice, submitting, onResolve }: {
 }
 
 function TerminalCard({ status }: { status: string }) {
+  const tr = useTr();
   const isDecline = status === 'Declined';
   return (
     <div className="card card-pad" style={{ textAlign: 'center', padding: '48px 24px' }}>
       <div style={{ width: 56, height: 56, borderRadius: 99, background: isDecline ? 'var(--red-soft)' : 'var(--surface-3)', color: isDecline ? 'var(--red)' : 'var(--muted)', display: 'grid', placeItems: 'center', margin: '0 auto 18px' }}>
         {isDecline ? <I.x size={28} stroke={2.5} /> : <I.flag size={26} />}
       </div>
-      <div style={{ fontSize: 17, fontWeight: 600 }}>{status}</div>
+      <div style={{ fontSize: 17, fontWeight: 600 }}>{tr(status)}</div>
       <div className="muted" style={{ fontSize: 13, marginTop: 6, maxWidth: 360, marginInline: 'auto' }}>
-        {isDecline ? 'This workflow was declined and has ended. The importer has been notified.' : 'This invoice was marked as not placed via the Purchasing Department. The workflow has ended.'}
+        {isDecline ? tr('This workflow was declined and has ended. The importer has been notified.') : tr('This invoice was marked as not placed via the Purchasing Department. The workflow has ended.')}
       </div>
     </div>
   );
 }
 
 function CompletedCard({ amount }: { amount: number }) {
+  const tr = useTr();
   return (
     <div className="card card-pad" style={{ textAlign: 'center', padding: '48px 24px' }}>
       <div style={{ width: 56, height: 56, borderRadius: 99, background: 'var(--green-soft)', color: 'var(--green)', display: 'grid', placeItems: 'center', margin: '0 auto 18px' }}>
         <I.check size={28} stroke={2.5} />
       </div>
-      <div style={{ fontSize: 17, fontWeight: 600 }}>Workflow complete</div>
+      <div style={{ fontSize: 17, fontWeight: 600 }}>{tr('Workflow complete')}</div>
       <div className="muted" style={{ fontSize: 13, marginTop: 6, maxWidth: 400, marginInline: 'auto' }}>
-        The Accounts Department has given final approval. This invoice ({fmtMoney(amount)}) has cleared all approval stages and is released for posting and payment.
+        {tr('The Accounts Department has given final approval. This invoice')} ({fmtMoney(amount)}) {tr('has cleared all approval stages and is released for posting and payment.')}
       </div>
     </div>
   );
 }
 
 function PendingPaymentCard() {
+  const tr = useTr();
   return (
     <div className="card card-pad" style={{ textAlign: 'center', padding: '48px 24px' }}>
       <div style={{ width: 56, height: 56, borderRadius: 99, background: 'var(--teal-soft)', color: 'var(--teal)', display: 'grid', placeItems: 'center', margin: '0 auto 18px' }}>
         <I.clock size={26} />
       </div>
-      <div style={{ fontSize: 17, fontWeight: 600 }}>Pending payment</div>
+      <div style={{ fontSize: 17, fontWeight: 600 }}>{tr('Pending payment')}</div>
       <div className="muted" style={{ fontSize: 13, marginTop: 6, maxWidth: 400, marginInline: 'auto' }}>
-        The Accounts Department has approved this invoice and placed it on hold pending payment. It will be released to the payment run once funds are scheduled.
+        {tr('The Accounts Department has approved this invoice and placed it on hold pending payment. It will be released to the payment run once funds are scheduled.')}
       </div>
     </div>
   );

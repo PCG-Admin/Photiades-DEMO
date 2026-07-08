@@ -234,7 +234,11 @@ export async function advanceWorkflowTask(instanceId: string, actionKey: string,
         if (fields.nonStkDoc) invoicePatch.non_stock_doc_number = String(fields.nonStkDoc);
         break;
       case 'requestInfo':
-        instancePatch = { status: 'Info Requested', task_idx: 0, ...(await resolveAssignee(tasks[0].id, invoice.total, tasks[0].role)) };
+        // Send to AP Clerk to fix/add the missing info, remembering where to
+        // resume so resubmitting doesn't re-run every approval that already
+        // happened before the question was raised (see requestInfo's resume
+        // handling in the 'default' branch below).
+        instancePatch = { status: 'Info Requested', task_idx: 0, return_task_idx: instance.task_idx, ...(await resolveAssignee(tasks[0].id, invoice.total, tasks[0].role)) };
         break;
       case 'additional': {
         const approver = await findAppUserByName(String(fields.approver || ''));
@@ -243,13 +247,16 @@ export async function advanceWorkflowTask(instanceId: string, actionKey: string,
       }
       default: {
         // forward transitions: approved / reviewed
-        const nextIdx = instance.task_idx + 1;
         const amount = invoicePatch.total ?? invoice.total;
+        // Resuming from a Request Info round-trip — pick up where it left
+        // off instead of always advancing by one, and clear the resume
+        // point now that it's been used.
+        const nextIdx = instance.task_idx === 0 && instance.return_task_idx != null ? instance.return_task_idx : instance.task_idx + 1;
         if (nextIdx >= tasks.length) {
-          instancePatch = { status: 'Completed' };
+          instancePatch = { status: 'Completed', return_task_idx: null };
           invoicePatch.status = 'Approved';
         } else {
-          instancePatch = { task_idx: nextIdx, status: 'In Progress', ...(await resolveAssignee(tasks[nextIdx].id, amount, tasks[nextIdx].role)) };
+          instancePatch = { task_idx: nextIdx, status: 'In Progress', return_task_idx: null, ...(await resolveAssignee(tasks[nextIdx].id, amount, tasks[nextIdx].role)) };
         }
       }
     }

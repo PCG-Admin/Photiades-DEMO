@@ -12,9 +12,10 @@ import { DocumentHighlightPreview } from '@/components/DocumentHighlightPreview'
 import { cx, fmtMoney } from '@/lib/utils';
 import { fmtDateShort } from '@/lib/format';
 import { RelativeTime } from '@/components/RelativeTime';
-import { STOCK_TYPES } from '@/lib/constants';
+import { STOCK_TYPES, nonStockDocOptions } from '@/lib/constants';
 import { useToast } from '@/components/providers/ToastProvider';
 import { useGo } from '@/lib/navigation';
+import { useTr } from '@/lib/i18n';
 import { getInvoiceByCode, updateInvoiceFields, deleteInvoice, type InvoiceWithLineItems } from '@/lib/server/invoices';
 import { getWorkflowInstanceForInvoice, type WorkflowInstanceWithHistory } from '@/lib/server/workflows';
 import { getAuditEvents } from '@/lib/server/audit';
@@ -24,6 +25,7 @@ import { errorMessage } from '@/lib/errorMessage';
 const isOverdue = (inv: InvoiceRow) => new Date(inv.due_at) < new Date() && !['Paid', 'Paid Invoice', 'Approved'].includes(inv.status);
 
 export function InvoicesView({ initialInvoices, initialId = null }: { initialInvoices: InvoiceRow[]; initialId?: string | null }) {
+  const tr = useTr();
   const [invoices, setInvoices] = useState<InvoiceRow[]>(initialInvoices);
   const [selectedCode, setSelectedCode] = useState<string | null>(initialId);
   const [tab, setTab] = useState('All');
@@ -67,17 +69,17 @@ export function InvoicesView({ initialInvoices, initialId = null }: { initialInv
 
   return (
     <div className="view-enter">
-      <PageHeader title="Invoice Processing"
-        sub="Review extracted data, resolve exceptions, and route invoices for approval."
-        actions={<button className="btn"><I.download size={16} />Export</button>}
+      <PageHeader title={tr('Invoice Processing')}
+        sub={tr('Review extracted data, resolve exceptions, and route invoices for approval.')}
+        actions={<button className="btn"><I.download size={16} />{tr('Export')}</button>}
       />
 
       {/* summary strip */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 'var(--gap-4)', marginBottom: 'var(--gap-5)' }}>
-        <MiniStat label="Total outstanding" value={fmtMoney(invoices.filter(i => !['Paid Invoice', 'Paid'].includes(i.status)).reduce((s, i) => s + i.total, 0))} tone="blue" />
-        <MiniStat label="At AcDep" value={tabCount('At AcDep')} sub="in accounts" tone="amber" />
-        <MiniStat label="Pending payment" value={tabCount('Pend. Pmt')} sub="awaiting run" tone="violet" />
-        <MiniStat label="Paid invoices" value={tabCount('Paid Invoice')} sub="settled" tone="green" />
+        <MiniStat label={tr('Total outstanding')} value={fmtMoney(invoices.filter(i => !['Paid Invoice', 'Paid'].includes(i.status)).reduce((s, i) => s + i.total, 0))} tone="blue" />
+        <MiniStat label={tr('At AcDep')} value={tabCount('At AcDep')} sub={tr('in accounts')} tone="amber" />
+        <MiniStat label={tr('Pending payment')} value={tabCount('Pend. Pmt')} sub={tr('awaiting run')} tone="violet" />
+        <MiniStat label={tr('Paid invoices')} value={tabCount('Paid Invoice')} sub={tr('settled')} tone="green" />
       </div>
 
       <div className="card" style={{ overflow: 'hidden' }}>
@@ -85,7 +87,7 @@ export function InvoicesView({ initialInvoices, initialId = null }: { initialInv
           <div className="tabs" style={{ border: 'none' }}>
             {tabs.map(t => (
               <button key={t} className={cx('tab', tab === t && 'on')} onClick={() => setTab(t)}>
-                {t} <span className="mono" style={{ fontSize: 11, opacity: 0.65 }}>{tabCount(t)}</span>
+                {tr(t)} <span className="mono" style={{ fontSize: 11, opacity: 0.65 }}>{tabCount(t)}</span>
               </button>
             ))}
           </div>
@@ -94,15 +96,15 @@ export function InvoicesView({ initialInvoices, initialId = null }: { initialInv
         <div style={{ padding: '12px var(--gap-5)', display: 'flex', alignItems: 'center', gap: 12, borderBottom: '1px solid var(--border)' }}>
           <div className="search" style={{ width: 280, padding: '6px 12px' }}>
             <I.search size={15} />
-            <input placeholder="Search vendor, invoice or PO…" value={q} onChange={e => setQ(e.target.value)} />
+            <input placeholder={tr('Search vendor, invoice or PO…')} value={q} onChange={e => setQ(e.target.value)} />
           </div>
           <div className="spacer" />
           {checked.size > 0 ? (
-            <span className="muted" style={{ fontSize: 12.5, fontWeight: 500 }}>{checked.size} selected</span>
+            <span className="muted" style={{ fontSize: 12.5, fontWeight: 500 }}>{checked.size} {tr('selected')}</span>
           ) : (
             <div className="row" style={{ gap: 8 }}>
-              <span className="muted" style={{ fontSize: 12 }}>Sort</span>
-              <Segmented options={[{ value: 'received', label: 'Recent' }, { value: 'amount', label: 'Amount' }]} value={sortBy} onChange={setSortBy} />
+              <span className="muted" style={{ fontSize: 12 }}>{tr('Sort')}</span>
+              <Segmented options={[{ value: 'received', label: tr('Recent') }, { value: 'amount', label: tr('Amount') }]} value={sortBy} onChange={setSortBy} />
             </div>
           )}
         </div>
@@ -112,8 +114,8 @@ export function InvoicesView({ initialInvoices, initialId = null }: { initialInv
             <thead>
               <tr>
                 <th style={{ width: 40 }}><Checkbox checked={checked.size === filtered.length && filtered.length > 0} onChange={toggleAll} /></th>
-                <th>Invoice</th><th>Vendor</th><th>PO match</th><th className="right">Amount</th>
-                <th style={{ width: 130 }}>Confidence</th><th>Status</th><th>Due</th>
+                <th>{tr('Invoice')}</th><th>{tr('Vendor')}</th><th>{tr('PO match')}</th><th className="right">{tr('Amount')}</th>
+                <th style={{ width: 130 }}>{tr('Confidence')}</th><th>{tr('Status')}</th><th>{tr('Due')}</th>
               </tr>
             </thead>
             <tbody>
@@ -126,15 +128,15 @@ export function InvoicesView({ initialInvoices, initialId = null }: { initialInv
                   </td>
                   <td>
                     <div className="mono" style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--accent-strong)' }}>{inv.code}</div>
-                    <div className="faint" style={{ fontSize: 11 }}>{inv.po || 'No PO'}</div>
+                    <div className="faint" style={{ fontSize: 11 }}>{inv.po || tr('No PO')}</div>
                   </td>
                   <td>
                     <div style={{ fontWeight: 500, fontSize: 13 }}>{inv.vendor}</div>
                     <div className="faint" style={{ fontSize: 11 }}>{inv.dept}</div>
                   </td>
                   <td>
-                    {inv.po_match == null ? <Badge tone="gray">Not checked</Badge> :
-                      inv.po_match === 'Matched' ? <Badge tone="green" dot>Matched</Badge> : <Badge tone="red" dot>{inv.po_match}</Badge>}
+                    {inv.po_match == null ? <Badge tone="gray">{tr('Not checked')}</Badge> :
+                      inv.po_match === 'Matched' ? <Badge tone="green" dot>{tr('Matched')}</Badge> : <Badge tone="red" dot>{inv.po_match}</Badge>}
                   </td>
                   <td className="right num" style={{ fontWeight: 600 }}>{fmtMoney(inv.total)}</td>
                   <td>
@@ -152,13 +154,13 @@ export function InvoicesView({ initialInvoices, initialId = null }: { initialInv
                     <span className="num" style={{ fontSize: 12.5, color: isOverdue(inv) ? 'var(--red)' : 'var(--text-2)', fontWeight: isOverdue(inv) ? 600 : 400 }}>
                       {fmtDateShort(new Date(inv.due_at))}
                     </span>
-                    {isOverdue(inv) && <div style={{ fontSize: 10, color: 'var(--red)', fontWeight: 600 }}>Overdue</div>}
+                    {isOverdue(inv) && <div style={{ fontSize: 10, color: 'var(--red)', fontWeight: 600 }}>{tr('Overdue')}</div>}
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
-          {filtered.length === 0 && <div className="empty"><I.invoice size={32} /><div style={{ marginTop: 10 }}>{invoices.length === 0 ? 'No invoices captured yet' : 'No invoices match your filters'}</div></div>}
+          {filtered.length === 0 && <div className="empty"><I.invoice size={32} /><div style={{ marginTop: 10 }}>{invoices.length === 0 ? tr('No invoices captured yet') : tr('No invoices match your filters')}</div></div>}
         </div>
       </div>
     </div>
@@ -172,6 +174,7 @@ function InvoiceDetail({ code, onBack, onSave, onDelete }: {
   onSave: (updated: InvoiceRow) => void;
   onDelete: (id: string) => void;
 }) {
+  const tr = useTr();
   const toast = useToast();
   const go = useGo();
   const [hoverField, setHoverField] = useState<string | null>(null);
@@ -205,8 +208,8 @@ function InvoiceDetail({ code, onBack, onSave, onDelete }: {
   if (loading || !inv) {
     return (
       <div className="view-enter">
-        <button className="btn ghost sm" onClick={onBack}><I.chevL size={16} />Back</button>
-        <div className="empty" style={{ marginTop: 40 }}><I.invoice size={32} /><div style={{ marginTop: 10 }}>Loading invoice…</div></div>
+        <button className="btn ghost sm" onClick={onBack}><I.chevL size={16} />{tr('Back')}</button>
+        <div className="empty" style={{ marginTop: 40 }}><I.invoice size={32} /><div style={{ marginTop: 10 }}>{tr('Loading invoice…')}</div></div>
       </div>
     );
   }
@@ -241,29 +244,29 @@ function InvoiceDetail({ code, onBack, onSave, onDelete }: {
     <div className="view-enter">
       {/* header bar */}
       <div className="row" style={{ gap: 14, marginBottom: 'var(--gap-5)', flexWrap: 'wrap' }}>
-        <button className="btn ghost sm" onClick={onBack}><I.chevL size={16} />Back</button>
+        <button className="btn ghost sm" onClick={onBack}><I.chevL size={16} />{tr('Back')}</button>
         <div>
           <div className="row" style={{ gap: 10 }}>
             <h2 style={{ margin: 0, fontSize: 19, fontWeight: 600 }} className="mono">{inv.code}</h2>
             <StatusBadge status={inv.status} />
             {inv.priority && <Badge tone="violet">{inv.priority}</Badge>}
           </div>
-          <div className="muted" style={{ fontSize: 13, marginTop: 3 }}>{inv.vendor} · received <RelativeTime date={new Date(inv.received_at)} /></div>
+          <div className="muted" style={{ fontSize: 13, marginTop: 3 }}>{inv.vendor} · {tr('received')} <RelativeTime date={new Date(inv.received_at)} /></div>
         </div>
         <div className="spacer" />
-        <button className="btn danger sm" onClick={() => setConfirmingDelete(true)}><I.trash size={15} />Delete</button>
+        <button className="btn danger sm" onClick={() => setConfirmingDelete(true)}><I.trash size={15} />{tr('Delete')}</button>
       </div>
 
       {confirmingDelete && (
-        <Modal title="Delete this invoice?" sub={`${inv.code} — ${inv.vendor}`} onClose={() => setConfirmingDelete(false)}
+        <Modal title={tr('Delete this invoice?')} sub={`${inv.code} — ${inv.vendor}`} onClose={() => setConfirmingDelete(false)}
           footer={<>
-            <button className="btn" onClick={() => setConfirmingDelete(false)} disabled={deleting}>Cancel</button>
-            <button className="btn danger" onClick={handleDelete} disabled={deleting}><I.trash size={15} />{deleting ? 'Deleting…' : 'Delete invoice'}</button>
+            <button className="btn" onClick={() => setConfirmingDelete(false)} disabled={deleting}>{tr('Cancel')}</button>
+            <button className="btn danger" onClick={handleDelete} disabled={deleting}><I.trash size={15} />{deleting ? tr('Deleting…') : tr('Delete invoice')}</button>
           </>}>
           <div className="row" style={{ gap: 10, color: 'var(--red)', alignItems: 'flex-start' }}>
             <I.alert size={18} style={{ flexShrink: 0, marginTop: 1 }} />
             <span style={{ fontSize: 13.5, lineHeight: 1.5 }}>
-              This permanently deletes the invoice, its line items, and its workflow history. It cannot be undone.
+              {tr('This permanently deletes the invoice, its line items, and its workflow history. It cannot be undone.')}
             </span>
           </div>
         </Modal>
@@ -273,7 +276,7 @@ function InvoiceDetail({ code, onBack, onSave, onDelete }: {
         <div className="card" style={{ borderColor: 'color-mix(in oklch, var(--red), transparent 60%)', background: 'var(--red-soft)', marginBottom: 'var(--gap-5)', padding: '14px 18px' }}>
           <div className="row" style={{ gap: 10, color: 'var(--red)' }}>
             <I.alert size={18} />
-            <span style={{ fontWeight: 600, fontSize: 13.5 }}>{inv.flags.length} validation {inv.flags.length === 1 ? 'exception' : 'exceptions'} detected</span>
+            <span style={{ fontWeight: 600, fontSize: 13.5 }}>{inv.flags.length} {tr('validation')} {inv.flags.length === 1 ? tr('exception') : tr('exceptions')} {tr('detected')}</span>
           </div>
           <ul style={{ margin: '10px 0 0', paddingLeft: 28, fontSize: 13, color: 'var(--text-2)', display: 'flex', flexDirection: 'column', gap: 4 }}>
             {inv.flags.map((f, i) => <li key={i}>{f}</li>)}
@@ -284,15 +287,15 @@ function InvoiceDetail({ code, onBack, onSave, onDelete }: {
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.05fr', gap: 'var(--gap-5)', alignItems: 'start' }}>
         {/* LEFT: the document uploaded at capture time, if any */}
         <div className="card" style={{ position: 'sticky', top: 0 }}>
-          <div className="card-head"><div className="card-title">Source document</div></div>
+          <div className="card-head"><div className="card-title">{tr('Source document')}</div></div>
           <div style={{ maxHeight: 'calc(100vh - 230px)', overflowY: 'auto', padding: 24, background: 'var(--surface-2)' }}>
             {inv.documentUrl ? (
               <DocumentHighlightPreview url={inv.documentUrl} mimeType={inv.document_mime_type} fileName={inv.code} />
             ) : (
               <div className="empty" style={{ padding: '60px 24px' }}>
                 <I.doc size={32} />
-                <div style={{ marginTop: 10 }}>No stored document</div>
-                <div className="faint" style={{ fontSize: 12, marginTop: 4 }}>This invoice was captured before document storage was added</div>
+                <div style={{ marginTop: 10 }}>{tr('No stored document')}</div>
+                <div className="faint" style={{ fontSize: 12, marginTop: 4 }}>{tr('This invoice was captured before document storage was added')}</div>
               </div>
             )}
           </div>
@@ -305,9 +308,9 @@ function InvoiceDetail({ code, onBack, onSave, onDelete }: {
 
           {/* Line items */}
           <div className="card">
-            <div className="card-head"><div className="card-title">Line items</div><Badge tone="gray">{inv.lineItems.length} lines</Badge></div>
+            <div className="card-head"><div className="card-title">{tr('Line items')}</div><Badge tone="gray">{inv.lineItems.length} {tr('lines')}</Badge></div>
             <table className="tbl">
-              <thead><tr><th>Description</th><th className="right">Qty</th><th className="right">Unit</th><th className="right">Amount</th><th>GL</th></tr></thead>
+              <thead><tr><th>{tr('Description')}</th><th className="right">{tr('Qty')}</th><th className="right">{tr('Unit')}</th><th className="right">{tr('Amount')}</th><th>{tr('GL')}</th></tr></thead>
               <tbody>
                 {inv.lineItems.map((li) => (
                   <tr key={li.id}>
@@ -318,9 +321,9 @@ function InvoiceDetail({ code, onBack, onSave, onDelete }: {
                     <td className="mono faint" style={{ fontSize: 11.5 }}>{li.gl_code}</td>
                   </tr>
                 ))}
-                {inv.lineItems.length === 0 && <tr><td colSpan={5} className="faint" style={{ fontSize: 12.5, padding: 12 }}>No line items captured</td></tr>}
+                {inv.lineItems.length === 0 && <tr><td colSpan={5} className="faint" style={{ fontSize: 12.5, padding: 12 }}>{tr('No line items captured')}</td></tr>}
                 <tr style={{ background: 'var(--surface-2)' }}>
-                  <td colSpan={3} style={{ fontWeight: 600, fontSize: 12.5 }}>Subtotal · VAT · Total</td>
+                  <td colSpan={3} style={{ fontWeight: 600, fontSize: 12.5 }}>{tr('Subtotal · VAT · Total')}</td>
                   <td className="right num" style={{ fontWeight: 700 }}>{fmtMoney(inv.total)}</td>
                   <td></td>
                 </tr>
@@ -331,14 +334,14 @@ function InvoiceDetail({ code, onBack, onSave, onDelete }: {
           {/* Approval chain (workflow history) */}
           <div className="card">
             <div className="card-head">
-              <div className="card-title">Workflow routing</div>
-              {instance && <Badge tone="blue">{instance.wf_id === 'stock' ? 'Stock' : 'Non-Stock'} workflow</Badge>}
+              <div className="card-title">{tr('Workflow routing')}</div>
+              {instance && <Badge tone="blue">{instance.wf_id === 'stock' ? tr('Stock') : tr('Non-Stock')} {tr('workflow')}</Badge>}
             </div>
             <div className="card-pad">
               {!instance ? (
-                <span className="faint" style={{ fontSize: 13 }}>No workflow started for this invoice.</span>
+                <span className="faint" style={{ fontSize: 13 }}>{tr('No workflow started for this invoice.')}</span>
               ) : chainSteps.length === 0 ? (
-                <span className="faint" style={{ fontSize: 13 }}>Awaiting the first task decision.</span>
+                <span className="faint" style={{ fontSize: 13 }}>{tr('Awaiting the first task decision.')}</span>
               ) : (
                 <ApprovalChain steps={chainSteps} amount={inv.total} />
               )}
@@ -347,9 +350,9 @@ function InvoiceDetail({ code, onBack, onSave, onDelete }: {
 
           {/* Immutable audit log for this invoice — SOW §5.7 (T149) */}
           <div className="card">
-            <div className="card-head"><div className="card-title">History</div><Badge tone="gray">{history.length}</Badge></div>
+            <div className="card-head"><div className="card-title">{tr('History')}</div><Badge tone="gray">{history.length}</Badge></div>
             <div style={{ padding: '8px 0' }}>
-              {history.length === 0 && <div className="faint" style={{ fontSize: 12.5, padding: '8px 20px' }}>No recorded actions yet</div>}
+              {history.length === 0 && <div className="faint" style={{ fontSize: 12.5, padding: '8px 20px' }}>{tr('No recorded actions yet')}</div>}
               {history.map(e => (
                 <div key={e.id} style={{ padding: '10px 20px', borderBottom: '1px solid var(--border)' }}>
                   <div style={{ fontSize: 13 }}>
@@ -379,14 +382,6 @@ type ShowToast = ReturnType<typeof useToast>;
 // Invoice indexing / storage form — the canonical field set from SOW §5.2
 function toISO(iso: string) { return iso.slice(0, 10); }
 
-// Plausible non-stock service-entry document numbers to offer in the dropdown,
-// per SOW §5.2 (Non-Stock Document Number: Dropdown).
-function nonStockDocOptions(current: string) {
-  const opts = new Set(['', 'SES-5100023891', 'SES-5100031204', 'SES-5100048822']);
-  if (current) opts.add(current);
-  return Array.from(opts);
-}
-
 function InvoiceForm({ inv, hoverField, setHoverField, onSave, toast }: {
   inv: InvoiceRow;
   hoverField: string | null;
@@ -394,6 +389,7 @@ function InvoiceForm({ inv, hoverField, setHoverField, onSave, toast }: {
   onSave: (updated: InvoiceRow) => void;
   toast: ShowToast;
 }) {
+  const tr = useTr();
   const xmlTone = inv.xml_status === 'Exported' ? 'green' : inv.xml_status === 'Failed' ? 'red' : 'amber';
 
   const init = useMemo(() => ({
@@ -446,35 +442,35 @@ function InvoiceForm({ inv, hoverField, setHoverField, onSave, toast }: {
     <div className="card">
       <div className="card-head">
         <div>
-          <div className="card-title">Invoice details</div>
-          <div className="card-sub">Fields stored on submit · hover to locate on document</div>
+          <div className="card-title">{tr('Invoice details')}</div>
+          <div className="card-sub">{tr('Fields stored on submit · hover to locate on document')}</div>
         </div>
         {dirty
-          ? <button className="btn primary sm" onClick={save} disabled={saving}>{saving ? 'Saving…' : <><I.check size={14} />Save</>}</button>
-          : inv.confidence != null && <Badge tone={inv.confidence >= 90 ? 'green' : 'amber'}>{inv.confidence}% extracted</Badge>}
+          ? <button className="btn primary sm" onClick={save} disabled={saving}>{saving ? tr('Saving…') : <><I.check size={14} />{tr('Save')}</>}</button>
+          : inv.confidence != null && <Badge tone={inv.confidence >= 90 ? 'green' : 'amber'}>{inv.confidence}% {tr('extracted')}</Badge>}
       </div>
 
       {/* Read-only document meta */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', borderBottom: '1px solid var(--border)' }}>
-        <ReadField label="Document Type" value="Invoice" />
-        <ReadField label="Status" value={inv.status} statusTone />
-        <ReadField label="XML Status" value={inv.xml_status} dot={`var(--${xmlTone})`} noBorder />
+        <ReadField label={tr('Document Type')} value={tr('Invoice')} />
+        <ReadField label={tr('Status')} value={inv.status} statusTone />
+        <ReadField label={tr('XML Status')} value={inv.xml_status} dot={`var(--${xmlTone})`} noBorder />
       </div>
 
       {/* Editable indexing fields */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px 16px', padding: 'var(--gap-5)' }}>
-        <FF label="Date" hk="date" hoverField={hoverField} setHoverField={setHoverField}>
+        <FF label={tr('Date')} hk="date" hoverField={hoverField} setHoverField={setHoverField}>
           <input type="date" className="input" value={form.date} onChange={e => set('date', e.target.value)} />
         </FF>
-        <FF label="Due Date" hk="due" hoverField={hoverField} setHoverField={setHoverField}>
+        <FF label={tr('Due Date')} hk="due" hoverField={hoverField} setHoverField={setHoverField}>
           <input type="date" className="input" value={form.dueDate} onChange={e => set('dueDate', e.target.value)} />
         </FF>
 
-        <FF label="Vendor" hk="vendor" hoverField={hoverField} setHoverField={setHoverField} span2>
+        <FF label={tr('Vendor')} hk="vendor" hoverField={hoverField} setHoverField={setHoverField} span2>
           <input type="text" className="input" value={form.vendor} onChange={e => set('vendor', e.target.value)} />
         </FF>
 
-        <FF label="Amount" hk="total" hoverField={hoverField} setHoverField={setHoverField}>
+        <FF label={tr('Amount')} hk="total" hoverField={hoverField} setHoverField={setHoverField}>
           <div style={{ position: 'relative' }}>
             <span style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', color: 'var(--muted)', fontSize: 13, fontFamily: 'var(--mono)' }}>€</span>
             <input type="text" inputMode="decimal" className="input mono" style={{ paddingLeft: 24, textAlign: 'right' }}
@@ -482,37 +478,37 @@ function InvoiceForm({ inv, hoverField, setHoverField, onSave, toast }: {
               onChange={e => set('amount', Number(e.target.value.replace(/[^0-9.]/g, '')) || 0)} />
           </div>
         </FF>
-        <FF label="Invoice Number" hk="invoiceNo" hoverField={hoverField} setHoverField={setHoverField}>
+        <FF label={tr('Invoice Number')} hk="invoiceNo" hoverField={hoverField} setHoverField={setHoverField}>
           <input type="text" className="input mono" value={form.invoiceNumber} onChange={e => set('invoiceNumber', e.target.value)} />
         </FF>
 
-        <FF label="Purchase Order Number" hk="po" hoverField={hoverField} setHoverField={setHoverField}>
-          <input type="text" className="input mono" placeholder="No PO" value={form.po} onChange={e => set('po', e.target.value)} />
+        <FF label={tr('Purchase Order Number')} hk="po" hoverField={hoverField} setHoverField={setHoverField}>
+          <input type="text" className="input mono" placeholder={tr('No PO')} value={form.po} onChange={e => set('po', e.target.value)} />
         </FF>
-        <FF label="Company Code" hoverField={hoverField} setHoverField={setHoverField}>
+        <FF label={tr('Company Code')} hoverField={hoverField} setHoverField={setHoverField}>
           <input type="text" className="input mono" value={form.companyCode} onChange={e => set('companyCode', e.target.value)} />
         </FF>
 
-        <FF label="Vendor Reference" hoverField={hoverField} setHoverField={setHoverField} span2>
+        <FF label={tr('Vendor Reference')} hoverField={hoverField} setHoverField={setHoverField} span2>
           <input type="text" className="input mono" value={form.vendorRef} onChange={e => set('vendorRef', e.target.value)} />
         </FF>
 
-        <FF label="Stock / Non Stock" hoverField={hoverField} setHoverField={setHoverField} span2>
+        <FF label={tr('Stock / Non Stock')} hoverField={hoverField} setHoverField={setHoverField} span2>
           <select className="input" value={form.stockType} onChange={e => set('stockType', e.target.value)}>
-            <option value="">— Unclassified —</option>
-            {STOCK_TYPES.map(o => <option key={o}>{o}</option>)}
+            <option value="">{tr('— Unclassified —')}</option>
+            {STOCK_TYPES.map(o => <option key={o} value={o}>{tr(o)}</option>)}
           </select>
         </FF>
 
         {form.stockType !== 'Non-stock' && (
-          <FF label="Stock Document Number" hoverField={hoverField} setHoverField={setHoverField} span2={form.stockType !== 'Stock & Non Stock'}>
+          <FF label={tr('Stock Document Number')} hoverField={hoverField} setHoverField={setHoverField} span2={form.stockType !== 'Stock & Non Stock'}>
             <input type="text" className="input mono" placeholder="e.g. MIGO-490000" value={form.stockDocNumber} onChange={e => set('stockDocNumber', e.target.value)} />
           </FF>
         )}
         {form.stockType !== 'Stock' && (
-          <FF label="Non-Stock Document Number" hoverField={hoverField} setHoverField={setHoverField} span2={form.stockType !== 'Stock & Non Stock'}>
+          <FF label={tr('Non-Stock Document Number')} hoverField={hoverField} setHoverField={setHoverField} span2={form.stockType !== 'Stock & Non Stock'}>
             <select className="input mono" value={form.nonStockDocNumber} onChange={e => set('nonStockDocNumber', e.target.value)}>
-              {nonStockDocOptions(form.nonStockDocNumber).map(o => <option key={o} value={o}>{o || '— Select —'}</option>)}
+              {nonStockDocOptions(form.nonStockDocNumber).map(o => <option key={o} value={o}>{o || tr('— Select —')}</option>)}
             </select>
           </FF>
         )}

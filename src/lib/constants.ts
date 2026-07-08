@@ -15,3 +15,12 @@ export interface ChainStep {
   action: string;
   when: Date | null;
 }
+
+// Plausible non-stock service-entry document numbers to offer in the
+// dropdown, per SOW §5.2 (Non-Stock Document Number: Dropdown). Shared
+// between CaptureView and InvoicesView so both render the same picklist.
+export function nonStockDocOptions(current: string): string[] {
+  const opts = new Set(['', 'SES-5100023891', 'SES-5100031204', 'SES-5100048822']);
+  if (current) opts.add(current);
+  return Array.from(opts);
+}

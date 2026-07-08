@@ -11,6 +11,7 @@ import { useGo } from '@/lib/navigation';
 import { TONE_VAR, SOFT_VAR } from '@/lib/utils';
 import { markNotificationRead, resolveNotificationTarget } from '@/lib/server/notifications';
 import { errorMessage } from '@/lib/errorMessage';
+import { useTr } from '@/lib/i18n';
 import type { NotificationRow } from '@/lib/supabase/types';
 
 const KIND_LABEL: Record<NotificationRow['kind'], string> = {
@@ -18,6 +19,7 @@ const KIND_LABEL: Record<NotificationRow['kind'], string> = {
 };
 
 export function NotificationsView({ initialNotifications }: { initialNotifications: NotificationRow[] }) {
+  const tr = useTr();
   const toast = useToast();
   const go = useGo();
   const [items, setItems] = useState<NotificationRow[]>(initialNotifications);
@@ -52,21 +54,21 @@ export function NotificationsView({ initialNotifications }: { initialNotificatio
 
   return (
     <div className="view-enter">
-      <PageHeader title="Notifications" sub="Task alerts, SLA warnings, and system messages."
-        actions={<button className="btn" onClick={markAllRead}><I.check size={15} />Mark all read</button>} />
+      <PageHeader title={tr('Notifications')} sub={tr('Task alerts, SLA warnings, and system messages.')}
+        actions={<button className="btn" onClick={markAllRead}><I.check size={15} />{tr('Mark all read')}</button>} />
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 'var(--gap-4)', marginBottom: 'var(--gap-5)' }}>
-        <MiniStat label="Unread" value={unreadCount} tone="blue" />
-        <MiniStat label="SLA warnings" value={items.filter(n => n.kind === 'sla').length} tone="amber" />
+        <MiniStat label={tr('Unread')} value={unreadCount} tone="blue" />
+        <MiniStat label={tr('SLA warnings')} value={items.filter(n => n.kind === 'sla').length} tone="amber" />
       </div>
 
       <div className="card" style={{ overflow: 'hidden' }}>
         <div className="card-head">
-          <Segmented options={['Unread', 'All']} value={filter} onChange={(v) => setFilter(String(v))} />
+          <Segmented options={[{ value: 'Unread', label: tr('Unread') }, { value: 'All', label: tr('All') }]} value={filter} onChange={(v) => setFilter(String(v))} />
           <Badge tone="gray">{filtered.length}</Badge>
         </div>
         <div>
-          {filtered.length === 0 && <div className="empty"><I.check size={32} /><div style={{ marginTop: 10 }}>You&apos;re all caught up!</div></div>}
+          {filtered.length === 0 && <div className="empty"><I.check size={32} /><div style={{ marginTop: 10 }}>{tr("You're all caught up!")}</div></div>}
           {filtered.map(n => {
             const Ico = (n.icon && I[n.icon]) || I.bell;
             const tone = n.tone ?? 'gray';

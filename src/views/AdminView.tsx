@@ -12,6 +12,7 @@ import { setRolePermission } from '@/lib/server/permissions';
 import { ASSIGNABLE_TASKS } from '@/lib/workflow';
 import { fmtMoney } from '@/lib/utils';
 import { useToast } from '@/components/providers/ToastProvider';
+import { useTr } from '@/lib/i18n';
 import type { AppUserRow, ApproverMappingRow, RolePermissionRow, PortalModule } from '@/lib/supabase/types';
 import { errorMessage } from '@/lib/errorMessage';
 
@@ -33,6 +34,7 @@ const PERMISSION_MODULES: { key: PortalModule; label: string; locked?: boolean }
 export function AdminView({ initialUsers, initialMappings, initialPermissions }: {
   initialUsers: AppUserRow[]; initialMappings: ApproverMappingRow[]; initialPermissions: RolePermissionRow[];
 }) {
+  const tr = useTr();
   const toast = useToast();
   const [users, setUsers] = useState<AppUserRow[]>(initialUsers);
   const [mappings, setMappings] = useState<ApproverMappingRow[]>(initialMappings);
@@ -121,24 +123,24 @@ export function AdminView({ initialUsers, initialMappings, initialPermissions }:
 
   return (
     <div className="view-enter">
-      <PageHeader title="User Administration" sub="Manage users, roles, and access across the Photiades portal."
+      <PageHeader title={tr('User Administration')} sub={tr('Manage users, roles, and access across the Photiades portal.')}
         actions={
           tab === 'Users'
-            ? <button className="btn primary" onClick={() => setEdit({ name: '', email: '', role: 'AP Clerk', dept: 'Finance', status: 'Active', isNew: true })}><I.plus size={16} />Add user</button>
+            ? <button className="btn primary" onClick={() => setEdit({ name: '', email: '', role: 'AP Clerk', dept: 'Finance', status: 'Active', isNew: true })}><I.plus size={16} />{tr('Add user')}</button>
             : tab === 'Approver Mapping'
-            ? <button className="btn primary" onClick={() => setAddingMapping(true)}><I.plus size={16} />Add mapping</button>
+            ? <button className="btn primary" onClick={() => setAddingMapping(true)}><I.plus size={16} />{tr('Add mapping')}</button>
             : undefined
         } />
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 'var(--gap-4)', marginBottom: 'var(--gap-5)' }}>
-        <MiniStat label="Total users" value={users.length} sub={`${users.filter(u => u.status === 'Active').length} active`} tone="blue" />
-        <MiniStat label="Roles configured" value={ROLES.length} tone="violet" />
-        <MiniStat label="MFA enabled" value={users.length === 0 ? '—' : `${Math.round(users.filter(u => u.mfa_enabled).length / users.length * 100)}%`} sub="of all users" tone="green" />
+        <MiniStat label={tr('Total users')} value={users.length} sub={`${users.filter(u => u.status === 'Active').length} ${tr('active')}`} tone="blue" />
+        <MiniStat label={tr('Roles configured')} value={ROLES.length} tone="violet" />
+        <MiniStat label={tr('MFA enabled')} value={users.length === 0 ? '—' : `${Math.round(users.filter(u => u.mfa_enabled).length / users.length * 100)}%`} sub={tr('of all users')} tone="green" />
       </div>
 
       <div className="tabs" style={{ marginBottom: 'var(--gap-5)' }}>
         {['Users', 'Roles & Permissions', 'Approver Mapping'].map(t => (
-          <button key={t} className={cx('tab', tab === t && 'on')} onClick={() => setTab(t)}>{t}</button>
+          <button key={t} className={cx('tab', tab === t && 'on')} onClick={() => setTab(t)}>{tr(t)}</button>
         ))}
       </div>
 
@@ -146,7 +148,7 @@ export function AdminView({ initialUsers, initialMappings, initialPermissions }:
         <div className="card" style={{ overflow: 'hidden' }}>
           <table className="tbl">
             <thead>
-              <tr><th>User</th><th>Role</th><th>Department</th><th>Status</th><th>MFA</th><th>Last active</th></tr>
+              <tr><th>{tr('User')}</th><th>{tr('Role')}</th><th>{tr('Department')}</th><th>{tr('Status')}</th><th>{tr('MFA')}</th><th>{tr('Last active')}</th></tr>
             </thead>
             <tbody>
               {users.map(u => (
@@ -160,14 +162,14 @@ export function AdminView({ initialUsers, initialMappings, initialPermissions }:
                       </div>
                     </div>
                   </td>
-                  <td><Badge tone={roleTone[u.role]}>{u.role}</Badge></td>
+                  <td><Badge tone={roleTone[u.role]}>{tr(u.role)}</Badge></td>
                   <td className="muted" style={{ fontSize: 12.5 }}>{u.dept}</td>
                   <td><StatusBadge status={u.status} /></td>
-                  <td>{u.mfa_enabled ? <span className="badge green"><I.shield size={12} />On</span> : <span className="faint" style={{ fontSize: 12 }}>Off</span>}</td>
-                  <td className="faint" style={{ fontSize: 12 }}>{u.last_active_at ? <RelativeTime date={new Date(u.last_active_at)} /> : 'Never'}</td>
+                  <td>{u.mfa_enabled ? <span className="badge green"><I.shield size={12} />{tr('On')}</span> : <span className="faint" style={{ fontSize: 12 }}>{tr('Off')}</span>}</td>
+                  <td className="faint" style={{ fontSize: 12 }}>{u.last_active_at ? <RelativeTime date={new Date(u.last_active_at)} /> : tr('Never')}</td>
                 </tr>
               ))}
-              {users.length === 0 && <tr><td colSpan={6} className="faint" style={{ padding: 20, textAlign: 'center' }}>No users yet</td></tr>}
+              {users.length === 0 && <tr><td colSpan={6} className="faint" style={{ padding: 20, textAlign: 'center' }}>{tr('No users yet')}</td></tr>}
             </tbody>
           </table>
         </div>
@@ -177,30 +179,30 @@ export function AdminView({ initialUsers, initialMappings, initialPermissions }:
             {rolePerms.map(r => (
               <div key={r.role} className="card card-pad">
                 <div className="row" style={{ justifyContent: 'space-between', marginBottom: 12 }}>
-                  <Badge tone={r.tone}>{r.role}</Badge>
-                  <span className="muted" style={{ fontSize: 12 }}><span className="mono">{users.filter(u => u.role === r.role).length}</span> users</span>
+                  <Badge tone={r.tone}>{tr(r.role)}</Badge>
+                  <span className="muted" style={{ fontSize: 12 }}><span className="mono">{users.filter(u => u.role === r.role).length}</span> {tr('users')}</span>
                 </div>
-                <div style={{ fontSize: 13, color: 'var(--text-2)', lineHeight: 1.5 }}>{r.perms}</div>
+                <div style={{ fontSize: 13, color: 'var(--text-2)', lineHeight: 1.5 }}>{tr(r.perms)}</div>
               </div>
             ))}
           </div>
 
           <div className="card" style={{ overflow: 'hidden' }}>
             <div className="card-head">
-              <div className="card-title">Per-module access</div>
-              <span className="faint" style={{ fontSize: 12 }}>Administrator always has full access</span>
+              <div className="card-title">{tr('Per-module access')}</div>
+              <span className="faint" style={{ fontSize: 12 }}>{tr('Administrator always has full access')}</span>
             </div>
             <table className="tbl">
               <thead>
                 <tr>
-                  <th>Module</th>
-                  {EDITABLE_ROLES.map(r => <th key={r} className="right">{r}</th>)}
+                  <th>{tr('Module')}</th>
+                  {EDITABLE_ROLES.map(r => <th key={r} className="right">{tr(r)}</th>)}
                 </tr>
               </thead>
               <tbody>
                 {PERMISSION_MODULES.map(mod => (
                   <tr key={mod.key}>
-                    <td style={{ fontSize: 13 }}>{mod.label}{mod.locked && <span className="faint" style={{ fontSize: 11, marginLeft: 6 }}>(always on)</span>}</td>
+                    <td style={{ fontSize: 13 }}>{tr(mod.label)}{mod.locked && <span className="faint" style={{ fontSize: 11, marginLeft: 6 }}>({tr('always on')})</span>}</td>
                     {EDITABLE_ROLES.map(role => (
                       <td key={role} className="right">
                         <input type="checkbox" disabled={mod.locked}
@@ -218,7 +220,7 @@ export function AdminView({ initialUsers, initialMappings, initialPermissions }:
         <div className="card" style={{ overflow: 'hidden' }}>
           <table className="tbl">
             <thead>
-              <tr><th>Task</th><th>Amount range</th><th>Routes to</th><th /></tr>
+              <tr><th>{tr('Task')}</th><th>{tr('Amount range')}</th><th>{tr('Routes to')}</th><th /></tr>
             </thead>
             <tbody>
               {mappings.map(m => {
@@ -228,22 +230,22 @@ export function AdminView({ initialUsers, initialMappings, initialPermissions }:
                   <tr key={m.id}>
                     <td style={{ fontSize: 13 }}>{task?.label ?? m.task_id}</td>
                     <td className="muted" style={{ fontSize: 12.5 }}>
-                      {m.min_amount == null && m.max_amount == null ? 'Any amount'
-                        : m.max_amount == null ? `Above ${fmtMoney(m.min_amount!)}`
-                        : m.min_amount == null ? `Up to ${fmtMoney(m.max_amount)}`
+                      {m.min_amount == null && m.max_amount == null ? tr('Any amount')
+                        : m.max_amount == null ? `${tr('Above')} ${fmtMoney(m.min_amount!)}`
+                        : m.min_amount == null ? `${tr('Up to')} ${fmtMoney(m.max_amount)}`
                         : `${fmtMoney(m.min_amount)} – ${fmtMoney(m.max_amount)}`}
                     </td>
                     <td>
-                      <Badge tone={roleTone[m.approver_role]}>{m.approver_role}</Badge>
+                      <Badge tone={roleTone[m.approver_role]}>{tr(m.approver_role)}</Badge>
                       {approverUser && <span className="muted" style={{ fontSize: 12.5, marginLeft: 8 }}>{approverUser.name}</span>}
                     </td>
                     <td style={{ textAlign: 'right' }}>
-                      <button title="Remove" onClick={() => removeMapping(m.id)} style={{ border: 'none', background: 'none', color: 'var(--faint)', display: 'grid', placeItems: 'center', padding: 6, borderRadius: 6, cursor: 'pointer' }}><I.trash size={14} /></button>
+                      <button title={tr('Remove')} onClick={() => removeMapping(m.id)} style={{ border: 'none', background: 'none', color: 'var(--faint)', display: 'grid', placeItems: 'center', padding: 6, borderRadius: 6, cursor: 'pointer' }}><I.trash size={14} /></button>
                     </td>
                   </tr>
                 );
               })}
-              {mappings.length === 0 && <tr><td colSpan={4} className="faint" style={{ padding: 20, textAlign: 'center' }}>No approver mappings configured — tasks fall back to their default role.</td></tr>}
+              {mappings.length === 0 && <tr><td colSpan={4} className="faint" style={{ padding: 20, textAlign: 'center' }}>{tr('No approver mappings configured — tasks fall back to their default role.')}</td></tr>}
             </tbody>
           </table>
         </div>
@@ -256,37 +258,38 @@ export function AdminView({ initialUsers, initialMappings, initialPermissions }:
 }
 
 function UserModal({ user, saving, onClose, onSave }: { user: EditUser; saving: boolean; onClose: () => void; onSave: (u: EditUser) => void }) {
+  const tr = useTr();
   const [form, setForm] = useState<EditUser>(user);
   const set = (k: keyof EditUser, v: string) => setForm(f => ({ ...f, [k]: v }));
   return (
-    <Modal title={user.isNew ? 'Add user' : 'Edit user'} sub={user.isNew ? 'Create a new directory entry' : user.email} onClose={onClose}
+    <Modal title={user.isNew ? tr('Add user') : tr('Edit user')} sub={user.isNew ? tr('Create a new directory entry') : user.email} onClose={onClose}
       footer={<>
-        <button className="btn" onClick={onClose}>Cancel</button>
-        <button className="btn primary" onClick={() => onSave(form)} disabled={!form.name || (user.isNew && !form.password) || saving}>{saving ? 'Saving…' : user.isNew ? 'Create' : 'Save changes'}</button>
+        <button className="btn" onClick={onClose}>{tr('Cancel')}</button>
+        <button className="btn primary" onClick={() => onSave(form)} disabled={!form.name || (user.isNew && !form.password) || saving}>{saving ? tr('Saving…') : user.isNew ? tr('Create') : tr('Save changes')}</button>
       </>}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-        <div className="field"><label>Full name</label><input className="input" value={form.name} onChange={e => set('name', e.target.value)} placeholder="e.g. Andreas Pavlou" /></div>
-        <div className="field"><label>Email</label><input className="input" value={form.email} onChange={e => set('email', e.target.value)} placeholder="name@photiades.com.cy" /></div>
+        <div className="field"><label>{tr('Full name')}</label><input className="input" value={form.name} onChange={e => set('name', e.target.value)} placeholder="e.g. Andreas Pavlou" /></div>
+        <div className="field"><label>{tr('Email')}</label><input className="input" value={form.email} onChange={e => set('email', e.target.value)} placeholder="name@photiades.com.cy" /></div>
         {user.isNew && (
           <div className="field">
-            <label>Temporary password</label>
-            <input className="input" type="text" value={form.password ?? ''} onChange={e => set('password', e.target.value)} placeholder="Shared with the user to sign in" />
+            <label>{tr('Temporary password')}</label>
+            <input className="input" type="text" value={form.password ?? ''} onChange={e => set('password', e.target.value)} placeholder={tr('Shared with the user to sign in')} />
           </div>
         )}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-          <div className="field"><label>Role</label>
+          <div className="field"><label>{tr('Role')}</label>
             <select className="input" value={form.role} onChange={e => set('role', e.target.value)}>
-              {ROLES.map(r => <option key={r}>{r}</option>)}
+              {ROLES.map(r => <option key={r} value={r}>{tr(r)}</option>)}
             </select>
           </div>
-          <div className="field"><label>Department</label>
+          <div className="field"><label>{tr('Department')}</label>
             <select className="input" value={form.dept} onChange={e => set('dept', e.target.value)}>
               {DEPTS.map(d => <option key={d}>{d}</option>)}
             </select>
           </div>
         </div>
-        <div className="field"><label>Status</label>
-          <Segmented options={['Active', 'Inactive']} value={form.status ?? ''} onChange={(v) => set('status', String(v))} />
+        <div className="field"><label>{tr('Status')}</label>
+          <Segmented options={[{ value: 'Active', label: tr('Active') }, { value: 'Inactive', label: tr('Inactive') }]} value={form.status ?? ''} onChange={(v) => set('status', String(v))} />
         </div>
       </div>
     </Modal>
@@ -296,6 +299,7 @@ function UserModal({ user, saving, onClose, onSave }: { user: EditUser; saving: 
 function ApproverMappingModal({ users, saving, onClose, onSave }: {
   users: AppUserRow[]; saving: boolean; onClose: () => void; onSave: (m: NewApproverMapping) => void;
 }) {
+  const tr = useTr();
   const [taskId, setTaskId] = useState(ASSIGNABLE_TASKS[0]?.id ?? '');
   const [minAmount, setMinAmount] = useState('');
   const [maxAmount, setMaxAmount] = useState('');
@@ -305,40 +309,40 @@ function ApproverMappingModal({ users, saving, onClose, onSave }: {
   const eligibleUsers = users.filter(u => u.role === role && u.status === 'Active');
 
   return (
-    <Modal title="Add approver mapping" sub="Route a task to a role or specific approver when the invoice amount matches"
+    <Modal title={tr('Add approver mapping')} sub={tr('Route a task to a role or specific approver when the invoice amount matches')}
       onClose={onClose}
       footer={<>
-        <button className="btn" onClick={onClose}>Cancel</button>
+        <button className="btn" onClick={onClose}>{tr('Cancel')}</button>
         <button className="btn primary" disabled={!taskId || saving} onClick={() => onSave({
           task_id: taskId,
           min_amount: minAmount ? Number(minAmount) : null,
           max_amount: maxAmount ? Number(maxAmount) : null,
           approver_role: role,
           approver_user_id: approverUserId || null,
-        })}>{saving ? 'Saving…' : 'Add mapping'}</button>
+        })}>{saving ? tr('Saving…') : tr('Add mapping')}</button>
       </>}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-        <div className="field"><label>Task</label>
+        <div className="field"><label>{tr('Task')}</label>
           <select className="input" value={taskId} onChange={e => setTaskId(e.target.value)}>
             {ASSIGNABLE_TASKS.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
           </select>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-          <div className="field"><label>Min amount (optional)</label>
-            <input className="input" type="number" value={minAmount} onChange={e => setMinAmount(e.target.value)} placeholder="No lower bound" />
+          <div className="field"><label>{tr('Min amount (optional)')}</label>
+            <input className="input" type="number" value={minAmount} onChange={e => setMinAmount(e.target.value)} placeholder={tr('No lower bound')} />
           </div>
-          <div className="field"><label>Max amount (optional)</label>
-            <input className="input" type="number" value={maxAmount} onChange={e => setMaxAmount(e.target.value)} placeholder="No upper bound" />
+          <div className="field"><label>{tr('Max amount (optional)')}</label>
+            <input className="input" type="number" value={maxAmount} onChange={e => setMaxAmount(e.target.value)} placeholder={tr('No upper bound')} />
           </div>
         </div>
-        <div className="field"><label>Route to role</label>
+        <div className="field"><label>{tr('Route to role')}</label>
           <select className="input" value={role} onChange={e => { setRole(e.target.value as AppUserRow['role']); setApproverUserId(''); }}>
-            {ROLES.map(r => <option key={r}>{r}</option>)}
+            {ROLES.map(r => <option key={r} value={r}>{tr(r)}</option>)}
           </select>
         </div>
-        <div className="field"><label>Specific approver (optional)</label>
+        <div className="field"><label>{tr('Specific approver (optional)')}</label>
           <select className="input" value={approverUserId} onChange={e => setApproverUserId(e.target.value)}>
-            <option value="">Anyone with this role</option>
+            <option value="">{tr('Anyone with this role')}</option>
             {eligibleUsers.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
           </select>
         </div>

@@ -7,6 +7,7 @@ import { cx } from '@/lib/utils';
 import { fmtTime } from '@/lib/format';
 import { downloadCsv } from '@/lib/csv';
 import { downloadXlsx } from '@/lib/xlsx';
+import { useTr } from '@/lib/i18n';
 import type { AuditEventRow } from '@/lib/supabase/types';
 
 const MODULES: AuditEventRow['module'][] = ['Invoices', 'Capture', 'Approvals', 'Admin', 'Reports', 'Auth', 'Workflows'];
@@ -15,6 +16,7 @@ const MODULES: AuditEventRow['module'][] = ['Invoices', 'Capture', 'Approvals', 
 // SOW §5.7 — every row here is append-only (audit_events has no update/delete
 // policy); "changes" renders the field-level before/after capture (T150).
 export function AuditView({ initialEvents }: { initialEvents: AuditEventRow[] }) {
+  const tr = useTr();
   const [q, setQ] = useState('');
   const [moduleFilter, setModuleFilter] = useState('All');
   const modules = ['All', ...MODULES];
@@ -39,31 +41,31 @@ export function AuditView({ initialEvents }: { initialEvents: AuditEventRow[] })
 
   return (
     <div className="view-enter">
-      <PageHeader title="Audit Trail" sub="Immutable, time-stamped log of every action across the portal."
+      <PageHeader title={tr('Audit Trail')} sub={tr('Immutable, time-stamped log of every action across the portal.')}
         actions={
           <div className="row" style={{ gap: 6 }}>
-            <button className="btn" onClick={() => downloadXlsx('audit-log.xlsx', exportRows())}><I.download size={15} />Export Excel</button>
-            <button className="btn" onClick={() => downloadCsv('audit-log.csv', exportRows())}><I.download size={15} />Export CSV</button>
+            <button className="btn" onClick={() => downloadXlsx('audit-log.xlsx', exportRows())}><I.download size={15} />{tr('Export Excel')}</button>
+            <button className="btn" onClick={() => downloadCsv('audit-log.csv', exportRows())}><I.download size={15} />{tr('Export CSV')}</button>
           </div>
         } />
 
       <div className="card" style={{ marginBottom: 'var(--gap-5)', padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
         <div className="search" style={{ width: 300, padding: '6px 12px' }}>
           <I.search size={15} />
-          <input placeholder="Search actor, action, or record…" value={q} onChange={e => setQ(e.target.value)} />
+          <input placeholder={tr('Search actor, action, or record…')} value={q} onChange={e => setQ(e.target.value)} />
         </div>
         <div className="row" style={{ gap: 4, flexWrap: 'wrap' }}>
           {modules.map(m => (
-            <button key={m} className={cx('btn sm', moduleFilter === m && 'primary')} onClick={() => setModuleFilter(m)}>{m}</button>
+            <button key={m} className={cx('btn sm', moduleFilter === m && 'primary')} onClick={() => setModuleFilter(m)}>{tr(m)}</button>
           ))}
         </div>
         <div className="spacer" />
-        <span className="muted" style={{ fontSize: 12.5 }}><span className="mono">{rows.length}</span> events</span>
+        <span className="muted" style={{ fontSize: 12.5 }}><span className="mono">{rows.length}</span> {tr('events')}</span>
       </div>
 
       <div className="card" style={{ overflow: 'hidden' }}>
         <div style={{ maxHeight: 'calc(100vh - 320px)', overflowY: 'auto' }}>
-          {rows.length === 0 && <div className="empty"><I.audit size={32} /><div style={{ marginTop: 10 }}>No audit events yet</div></div>}
+          {rows.length === 0 && <div className="empty"><I.audit size={32} /><div style={{ marginTop: 10 }}>{tr('No audit events yet')}</div></div>}
           {Object.entries(groups).map(([day, events]) => (
             <div key={day}>
               <div style={{ position: 'sticky', top: 0, zIndex: 2, background: 'var(--surface-2)', borderBottom: '1px solid var(--border)', padding: '8px 20px', fontSize: 11.5, fontWeight: 600, color: 'var(--muted)', letterSpacing: '0.03em' }}>{day}</div>

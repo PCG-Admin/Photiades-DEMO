@@ -14,7 +14,8 @@ import { createInvoiceFromExtraction, findDuplicateInvoice, findDuplicateInvoice
 import { DocumentHighlightPreview } from '@/components/DocumentHighlightPreview';
 import { sha256Hex } from '@/lib/hash';
 import { ACCEPTED_UPLOAD_TYPES, ACCEPTED_UPLOAD_EXTENSIONS, MAX_UPLOAD_BYTES } from '@/lib/uploadConstraints';
-import { COMPANY_CODES } from '@/lib/constants';
+import { COMPANY_CODES, nonStockDocOptions } from '@/lib/constants';
+import { useTr } from '@/lib/i18n';
 import type { ExtractedInvoice } from '@/lib/gemini/extract';
 import type { InvoiceRow } from '@/lib/supabase/types';
 import { errorMessage } from '@/lib/errorMessage';
@@ -92,6 +93,7 @@ interface MaterialRow { item: string; material: string }
 
 // =================== DOCUMENT CAPTURE — "Store to Documents" ===================
 export function CaptureView() {
+  const tr = useTr();
   const toast = useToast();
   const go = useGo();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -233,9 +235,9 @@ export function CaptureView() {
   if (!uploaded) {
     return (
       <div className="view-enter">
-        <PageHeader title="Document Capture"
-          sub="Upload a document to capture and index it into the portal."
-          actions={<button className="btn primary" onClick={() => fileInputRef.current?.click()}><I.upload size={16} />Upload document</button>}
+        <PageHeader title={tr('Document Capture')}
+          sub={tr('Upload a document to capture and index it into the portal.')}
+          actions={<button className="btn primary" onClick={() => fileInputRef.current?.click()}><I.upload size={16} />{tr('Upload document')}</button>}
         />
         <input ref={fileInputRef} type="file" accept={[...ACCEPTED_UPLOAD_TYPES, ...ACCEPTED_UPLOAD_EXTENSIONS].join(',')} style={{ display: 'none' }}
           onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f); e.target.value = ''; }} />
@@ -255,10 +257,10 @@ export function CaptureView() {
           <div style={{ width: 72, height: 72, borderRadius: 18, background: 'var(--accent-soft)', color: 'var(--accent)', display: 'grid', placeItems: 'center' }}>
             <I.upload size={32} />
           </div>
-          <div style={{ fontWeight: 600, fontSize: 17 }}>Drop a document to capture</div>
-          <div className="muted" style={{ fontSize: 13.5, maxWidth: 380, lineHeight: 1.5 }}>or click to browse · PDF, PNG, JPG, WEBP. Fields are auto-extracted and the Store form opens for review.</div>
+          <div style={{ fontWeight: 600, fontSize: 17 }}>{tr('Drop a document to capture')}</div>
+          <div className="muted" style={{ fontSize: 13.5, maxWidth: 380, lineHeight: 1.5 }}>{tr('or click to browse · PDF, PNG, JPG, WEBP. Fields are auto-extracted and the Store form opens for review.')}</div>
           <div className="row" style={{ gap: 10, marginTop: 6 }}>
-            <button className="btn primary lg" onClick={(e) => { e.stopPropagation(); fileInputRef.current?.click(); }}><I.upload size={16} />Upload document</button>
+            <button className="btn primary lg" onClick={(e) => { e.stopPropagation(); fileInputRef.current?.click(); }}><I.upload size={16} />{tr('Upload document')}</button>
           </div>
         </div>
       </div>
@@ -269,27 +271,27 @@ export function CaptureView() {
     <div className="cap-wrap view-enter">
       {/* Toolbar */}
       <div className="cap-toolbar">
-        <button className="cap-tbtn" onClick={cancel}><I.chevL size={15} />Cancel</button>
-        <button className="cap-tbtn" onClick={reset}><I.refresh size={14} />Reset</button>
+        <button className="cap-tbtn" onClick={cancel}><I.chevL size={15} />{tr('Cancel')}</button>
+        <button className="cap-tbtn" onClick={reset}><I.refresh size={14} />{tr('Reset')}</button>
         <div className="spacer" />
-        {confidence != null && <Badge tone={confidence >= 80 ? 'green' : confidence >= 60 ? 'amber' : 'red'}>{confidence}% extracted</Badge>}
-        <button className="cap-store" onClick={store} disabled={extracting || storing || (!!duplicateOf && !overrideDuplicate)}>{storing ? 'Storing…' : 'Store'}</button>
+        {confidence != null && <Badge tone={confidence >= 80 ? 'green' : confidence >= 60 ? 'amber' : 'red'}>{confidence}% {tr('extracted')}</Badge>}
+        <button className="cap-store" onClick={store} disabled={extracting || storing || (!!duplicateOf && !overrideDuplicate)}>{storing ? tr('Storing…') : tr('Store')}</button>
         <button className="cap-tbtn icon"><I.dots size={16} /></button>
       </div>
 
       {extracting && (
         <div className="card" style={{ padding: '10px 16px', marginBottom: 12, background: 'var(--accent-softer)', border: '1px solid var(--accent-soft)' }}>
-          <div className="row" style={{ gap: 10 }}><I.refresh size={15} style={{ animation: 'spin 0.9s linear infinite' }} /><span style={{ fontSize: 13 }}>Extracting fields…</span></div>
+          <div className="row" style={{ gap: 10 }}><I.refresh size={15} style={{ animation: 'spin 0.9s linear infinite' }} /><span style={{ fontSize: 13 }}>{tr('Extracting fields…')}</span></div>
         </div>
       )}
       {extractError && !extracting && (
         <div className="card" style={{ padding: '10px 16px', marginBottom: 12, background: 'var(--red-soft)', border: '1px solid var(--red)' }}>
-          <div className="row" style={{ gap: 10, color: 'var(--red)' }}><I.alert size={15} /><span style={{ fontSize: 13 }}>{extractError} — fill in the fields manually below.</span></div>
+          <div className="row" style={{ gap: 10, color: 'var(--red)' }}><I.alert size={15} /><span style={{ fontSize: 13 }}>{extractError} — {tr('fill in the fields manually below.')}</span></div>
         </div>
       )}
       {checkingDuplicate && (
         <div className="card" style={{ padding: '10px 16px', marginBottom: 12, background: 'var(--surface-2)' }}>
-          <div className="row" style={{ gap: 10 }}><I.refresh size={15} style={{ animation: 'spin 0.9s linear infinite' }} /><span className="muted" style={{ fontSize: 13 }}>Checking for duplicates…</span></div>
+          <div className="row" style={{ gap: 10 }}><I.refresh size={15} style={{ animation: 'spin 0.9s linear infinite' }} /><span className="muted" style={{ fontSize: 13 }}>{tr('Checking for duplicates…')}</span></div>
         </div>
       )}
       {duplicateOf && !checkingDuplicate && (
@@ -298,16 +300,16 @@ export function CaptureView() {
             <I.alert size={15} />
             <span style={{ fontSize: 13, color: 'var(--text)' }}>
               {duplicateReason === 'file'
-                ? <>This exact file was already stored as <strong>{duplicateOf.code}</strong> ({duplicateOf.vendor}, {duplicateOf.status}).</>
-                : <>Possible duplicate — <strong>{duplicateOf.code}</strong> from {duplicateOf.vendor} with this invoice number already exists ({duplicateOf.status}).</>}
+                ? <>{tr('This exact file was already stored as')} <strong>{duplicateOf.code}</strong> ({duplicateOf.vendor}, {duplicateOf.status}).</>
+                : <>{tr('Possible duplicate —')} <strong>{duplicateOf.code}</strong> {tr('from')} {duplicateOf.vendor} {tr('with this invoice number already exists')} ({duplicateOf.status}).</>}
             </span>
             <div className="spacer" />
-            <button className="btn ghost sm" onClick={() => go('invoices', duplicateOf.code)}>View existing<I.arrowR size={14} /></button>
+            <button className="btn ghost sm" onClick={() => go('invoices', duplicateOf.code)}>{tr('View existing')}<I.arrowR size={14} /></button>
             {!overrideDuplicate && (
               <button className="btn sm" onClick={() => {
                 setOverrideDuplicate(true);
                 if (duplicateReason === 'file' && file) runExtraction(file);
-              }}>{duplicateReason === 'file' ? 'Extract anyway' : 'Store anyway'}</button>
+              }}>{duplicateReason === 'file' ? tr('Extract anyway') : tr('Store anyway')}</button>
             )}
           </div>
         </div>
@@ -317,108 +319,108 @@ export function CaptureView() {
       <div className="cap-panes">
         {/* LEFT — indexing form */}
         <div className="cap-form">
-          <CapField label="Document Type"><CapInput value={form.docType} readOnly /></CapField>
-          <CapField label="Status"><CapInput value={form.status} readOnly /></CapField>
-          <CapField label="XML Status"><CapInput value={form.xmlStatus} readOnly /></CapField>
+          <CapField label={tr('Document Type')}><CapInput value={form.docType} readOnly /></CapField>
+          <CapField label={tr('Status')}><CapInput value={form.status} readOnly /></CapField>
+          <CapField label={tr('XML Status')}><CapInput value={form.xmlStatus} readOnly /></CapField>
 
-          <CapField label="Date" hlKey="date" activeField={activeField} onSelect={setActiveField}>
+          <CapField label={tr('Date')} hlKey="date" activeField={activeField} onSelect={setActiveField}>
             <CapDate value={form.date} onChange={v => set('date', v)} active invalid={dateInvalid} />
-            {dateInvalid && <div className="cap-err"><I.alert size={12} />Date is more than {MAX_DATE_AGE_MONTHS} months old — not accepted</div>}
+            {dateInvalid && <div className="cap-err"><I.alert size={12} />{tr('Date is more than')} {MAX_DATE_AGE_MONTHS} {tr('months old — not accepted')}</div>}
           </CapField>
-          <CapField label="Due Date" hlKey="dueDate" activeField={activeField} onSelect={setActiveField}>
+          <CapField label={tr('Due Date')} hlKey="dueDate" activeField={activeField} onSelect={setActiveField}>
             <CapDate value={form.dueDate} onChange={v => set('dueDate', v)} />
           </CapField>
 
-          <CapField label="Vendor" hlKey="vendor" activeField={activeField} onSelect={setActiveField}><CapInput value={form.vendor} onChange={v => set('vendor', v)} chevron /></CapField>
-          <CapField label="Amount" hlKey="total" activeField={activeField} onSelect={setActiveField}><CapInput value={form.amount} onChange={v => set('amount', v)} chevron /></CapField>
-          <CapField label="Purchase Order Number" hlKey="po" activeField={activeField} onSelect={setActiveField}><CapInput value={form.po} onChange={v => set('po', v)} chevron /></CapField>
-          <CapField label="Company Code" hlKey="companyCode" activeField={activeField} onSelect={setActiveField}>
+          <CapField label={tr('Vendor')} hlKey="vendor" activeField={activeField} onSelect={setActiveField}><CapInput value={form.vendor} onChange={v => set('vendor', v)} chevron /></CapField>
+          <CapField label={tr('Amount')} hlKey="total" activeField={activeField} onSelect={setActiveField}><CapInput value={form.amount} onChange={v => set('amount', v)} chevron /></CapField>
+          <CapField label={tr('Purchase Order Number')} hlKey="po" activeField={activeField} onSelect={setActiveField}><CapInput value={form.po} onChange={v => set('po', v)} chevron /></CapField>
+          <CapField label={tr('Company Code')} hlKey="companyCode" activeField={activeField} onSelect={setActiveField}>
             <CapSelect value={form.companyCode} onChange={v => set('companyCode', v)} options={CAP_COMPANY_CODES} />
-            {!form.companyCode && <div className="cap-err"><I.alert size={12} />Not found on document — select the correct code</div>}
+            {!form.companyCode && <div className="cap-err"><I.alert size={12} />{tr('Not found on document — select the correct code')}</div>}
           </CapField>
-          <CapField label="Invoice Number" hlKey="invoiceNo" activeField={activeField} onSelect={setActiveField}><CapInput value={form.invoiceNumber} onChange={v => set('invoiceNumber', v)} chevron /></CapField>
-          <CapField label="Vendor Reference" hlKey="vendorRef" activeField={activeField} onSelect={setActiveField}><CapInput value={form.vendorRef} onChange={v => set('vendorRef', v)} chevron /></CapField>
+          <CapField label={tr('Invoice Number')} hlKey="invoiceNo" activeField={activeField} onSelect={setActiveField}><CapInput value={form.invoiceNumber} onChange={v => set('invoiceNumber', v)} chevron /></CapField>
+          <CapField label={tr('Vendor Reference')} hlKey="vendorRef" activeField={activeField} onSelect={setActiveField}><CapInput value={form.vendorRef} onChange={v => set('vendorRef', v)} chevron /></CapField>
 
-          <CapField label="SAP Posting Type">
+          <CapField label={tr('SAP Posting Type')}>
             <CapSelect value={form.sapPostingType} onChange={v => set('sapPostingType', v)} options={CAP_SAP_TYPES} />
           </CapField>
-          <CapField label="SAP Invoice Text">
+          <CapField label={tr('SAP Invoice Text')}>
             <input className="cap-input" style={{ height: 'auto', paddingTop: 6, paddingBottom: 6, paddingRight: 9 }}
               value={form.sapInvText} onChange={e => set('sapInvText', e.target.value)} placeholder="" />
           </CapField>
 
-          <CapField label="Stock / Non Stock">
+          <CapField label={tr('Stock / Non Stock')}>
             <CapSelect value={form.stockType} onChange={v => set('stockType', v)} options={CAP_STOCK_TYPES} />
           </CapField>
-          <CapField label="Stock Document Number">
+          <CapField label={tr('Stock Document Number')}>
             <CapInput value={form.stockDocNumber} onChange={v => set('stockDocNumber', v)} chevron
               disabled={form.stockType === 'Non-stock'} />
           </CapField>
-          <CapField label="Non-Stock Document Number">
-            <CapInput value={form.nonStockDocNumber} onChange={v => set('nonStockDocNumber', v)} chevron
-              disabled={form.stockType === 'Stock'} />
+          <CapField label={tr('Non-Stock Document Number')}>
+            <CapSelect value={form.nonStockDocNumber} onChange={v => set('nonStockDocNumber', v)}
+              options={nonStockDocOptions(form.nonStockDocNumber)} disabled={form.stockType === 'Stock'} />
           </CapField>
 
           {/* Line items — extracted from the document by Gemini; review/edit before storing */}
-          <CapField label="Line Items" top>
+          <CapField label={tr('Line Items')} top>
             <div className="cap-mat-head">
-              <span className="cap-mat-count">{lineItems.length} lines</span>
+              <span className="cap-mat-count">{lineItems.length} {tr('lines')}</span>
               <div className="spacer" />
-              <button className="cap-mat-autofill" onClick={addLineItem}><I.plus size={13} />Add line</button>
+              <button className="cap-mat-autofill" onClick={addLineItem}><I.plus size={13} />{tr('Add line')}</button>
             </div>
             <div className="cap-mat-table">
               <div className="cap-li-row cap-mat-colhead">
-                <div>Description</div>
-                <div style={{ textAlign: 'right' }}>Qty</div>
-                <div style={{ textAlign: 'right' }}>Unit</div>
-                <div style={{ textAlign: 'right' }}>Amount</div>
-                <div>GL</div>
+                <div>{tr('Description')}</div>
+                <div style={{ textAlign: 'right' }}>{tr('Qty')}</div>
+                <div style={{ textAlign: 'right' }}>{tr('Unit')}</div>
+                <div style={{ textAlign: 'right' }}>{tr('Amount')}</div>
+                <div>{tr('GL')}</div>
                 <div />
               </div>
               <div className="cap-mat-body">
                 {lineItems.map((li, i) => (
                   <div key={i} className="cap-li-row cap-mat-row">
-                    <input className="cap-mat-input" value={li.description} placeholder="Description"
+                    <input className="cap-mat-input" value={li.description} placeholder={tr('Description')}
                       onChange={e => updateLineItem(i, { description: e.target.value })} />
-                    <input className="cap-mat-input num" value={li.qty} placeholder="Qty"
+                    <input className="cap-mat-input num" value={li.qty} placeholder={tr('Qty')}
                       onChange={e => updateLineItem(i, { qty: Number(e.target.value) || 0 })} />
-                    <input className="cap-mat-input num" value={li.unitPrice} placeholder="Unit"
+                    <input className="cap-mat-input num" value={li.unitPrice} placeholder={tr('Unit')}
                       onChange={e => updateLineItem(i, { unitPrice: Number(e.target.value) || 0 })} />
-                    <input className="cap-mat-input num" value={li.amount} placeholder="Amount"
+                    <input className="cap-mat-input num" value={li.amount} placeholder={tr('Amount')}
                       onChange={e => updateLineItem(i, { amount: Number(e.target.value) || 0 })} />
-                    <input className="cap-mat-input" value={li.glCode ?? ''} placeholder="GL"
+                    <input className="cap-mat-input" value={li.glCode ?? ''} placeholder={tr('GL')}
                       onChange={e => updateLineItem(i, { glCode: e.target.value || null })} />
                     <button className="cap-mat-del" onClick={() => removeLineItem(i)}><I.x size={13} /></button>
                   </div>
                 ))}
-                {lineItems.length === 0 && <div className="cap-mat-empty">No line items captured — add one manually if needed</div>}
+                {lineItems.length === 0 && <div className="cap-mat-empty">{tr('No line items captured — add one manually if needed')}</div>}
               </div>
             </div>
           </CapField>
 
           {/* Material Code table */}
-          <CapField label="Material Code" top>
+          <CapField label={tr('Material Code')} top>
             <div className="cap-mat-head">
-              <span className="cap-mat-count">{rows.length} rows</span>
+              <span className="cap-mat-count">{rows.length} {tr('rows')}</span>
               <div className="spacer" />
-              <button className="cap-mat-autofill" onClick={() => toast('Autofill table')}><I.pin size={13} />Autofill Table</button>
-              <button className="cap-tbtn icon" title="Table options"><I.dashboard size={15} /></button>
+              <button className="cap-mat-autofill" onClick={() => toast('Autofill table')}><I.pin size={13} />{tr('Autofill Table')}</button>
+              <button className="cap-tbtn icon" title={tr('Table options')}><I.dashboard size={15} /></button>
             </div>
             <div className="cap-mat-table">
               <div className="cap-mat-row cap-mat-colhead">
-                <div>Item</div>
-                <div>Material</div>
+                <div>{tr('Item')}</div>
+                <div>{tr('Material')}</div>
               </div>
               <div className="cap-mat-body">
-                <button className="cap-mat-add" onClick={() => setRows(r => [...r, { item: '', material: '' }])} title="Add row"><I.plus size={14} /></button>
+                <button className="cap-mat-add" onClick={() => setRows(r => [...r, { item: '', material: '' }])} title={tr('Add row')}><I.plus size={14} /></button>
                 {rows.map((r, i) => (
                   <div key={i} className="cap-mat-row">
-                    <input className="cap-mat-input" value={r.item} placeholder="Item" onChange={e => setRows(rs => rs.map((x, j) => j === i ? { ...x, item: e.target.value } : x))} />
-                    <input className="cap-mat-input" value={r.material} placeholder="Material" onChange={e => setRows(rs => rs.map((x, j) => j === i ? { ...x, material: e.target.value } : x))} />
+                    <input className="cap-mat-input" value={r.item} placeholder={tr('Item')} onChange={e => setRows(rs => rs.map((x, j) => j === i ? { ...x, item: e.target.value } : x))} />
+                    <input className="cap-mat-input" value={r.material} placeholder={tr('Material')} onChange={e => setRows(rs => rs.map((x, j) => j === i ? { ...x, material: e.target.value } : x))} />
                     <button className="cap-mat-del" onClick={() => setRows(rs => rs.filter((_, j) => j !== i))}><I.x size={13} /></button>
                   </div>
                 ))}
-                {rows.length === 0 && <div className="cap-mat-empty">No material lines</div>}
+                {rows.length === 0 && <div className="cap-mat-empty">{tr('No material lines')}</div>}
               </div>
             </div>
           </CapField>
@@ -436,7 +438,7 @@ export function CaptureView() {
             <button className="cap-vbtn"><I.edit size={15} /></button>
             <button className="cap-vbtn"><I.tag size={15} /></button>
             <div className="spacer" />
-            <span className="cap-vpage">Page 1 / 1</span>
+            <span className="cap-vpage">{tr('Page')} 1 / 1</span>
           </div>
           <div className="cap-vcanvas">
             <DocumentHighlightPreview url={previewUrl} mimeType={file?.type ?? null} fileName={file?.name} boxes={boxes} activeField={activeField} />
@@ -477,13 +479,13 @@ function CapInput({ value, onChange, readOnly, chevron, disabled }: {
   );
 }
 
-function CapSelect({ value, onChange, options }: {
-  value: string | number; onChange: (v: string) => void; options: string[];
+function CapSelect({ value, onChange, options, disabled }: {
+  value: string | number; onChange: (v: string) => void; options: string[]; disabled?: boolean;
 }) {
   return (
     <div className="cap-fieldbox">
-      <select className="cap-input has-chevron" value={value} onChange={e => onChange(e.target.value)} style={{ appearance: 'none', WebkitAppearance: 'none' }}>
-        {options.map(o => <option key={o} value={o}>{o}</option>)}
+      <select className="cap-input has-chevron" value={value} onChange={e => onChange(e.target.value)} disabled={disabled} style={{ appearance: 'none', WebkitAppearance: 'none' }}>
+        {options.map(o => <option key={o} value={o}>{o || '— Select —'}</option>)}
       </select>
       <I.chevD size={15} className="cap-chev" />
     </div>

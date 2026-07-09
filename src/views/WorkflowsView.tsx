@@ -60,7 +60,7 @@ export function WorkflowsView({ initialInstances, initialOpen = null }: { initia
 
       {/* Workflow switcher */}
       <div style={{ marginBottom: 'var(--gap-5)' }}>
-        <Segmented options={WORKFLOWS.map(w => ({ value: w.id, label: w.name }))} value={wfId} onChange={(v) => setWfId(String(v))} />
+        <Segmented options={WORKFLOWS.map(w => ({ value: w.id, label: tr(w.name) }))} value={wfId} onChange={(v) => setWfId(String(v))} />
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 'var(--gap-4)', marginBottom: 'var(--gap-5)' }}>
@@ -73,7 +73,7 @@ export function WorkflowsView({ initialInstances, initialOpen = null }: { initia
       {/* Workflow definition strip */}
       <div className="card" style={{ marginBottom: 'var(--gap-5)', padding: '16px 20px' }}>
         <div className="row" style={{ justifyContent: 'space-between', marginBottom: 14 }}>
-          <div className="card-title">{wf.name}</div>
+          <div className="card-title">{tr(wf.name)}</div>
           <Badge tone="blue" dot>{tasks.filter(t => !t.auto).length} {tr('tasks')}</Badge>
         </div>
         <div className="row" style={{ gap: 0, flexWrap: 'wrap', rowGap: 8 }}>
@@ -82,8 +82,8 @@ export function WorkflowsView({ initialInstances, initialOpen = null }: { initia
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 14px', borderRadius: 8, background: t.auto ? 'var(--violet-soft)' : 'var(--surface-2)', border: '1px solid var(--border)' }}>
                 <div style={{ width: 24, height: 24, borderRadius: 99, background: t.auto ? 'var(--violet)' : 'var(--accent)', color: 'white', display: 'grid', placeItems: 'center', fontSize: 12, fontWeight: 700 }}>{i + 1}</div>
                 <div>
-                  <div style={{ fontSize: 12.5, fontWeight: 600 }}>{t.name}</div>
-                  <div className="faint" style={{ fontSize: 10.5 }}>{t.role}</div>
+                  <div style={{ fontSize: 12.5, fontWeight: 600 }}>{tr(t.name)}</div>
+                  <div className="faint" style={{ fontSize: 10.5 }}>{tr(t.role)}</div>
                 </div>
               </div>
               {i < tasks.length - 1 && <I.arrowR size={16} style={{ color: 'var(--faint)', margin: '0 6px' }} />}
@@ -93,8 +93,8 @@ export function WorkflowsView({ initialInstances, initialOpen = null }: { initia
         {branch && (
           <div className="row" style={{ gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
             <span className="faint" style={{ fontSize: 11.5 }}>{tr('Amount check branch:')}</span>
-            <Badge tone="teal">&gt; €{branch.threshold} → {branch.over}</Badge>
-            <Badge tone="gray">≤ €{branch.threshold} → {branch.under} ({tr('skips')} {tasks[branch.skipIdx].name})</Badge>
+            <Badge tone="teal">&gt; €{branch.threshold} → {tr(branch.over)}</Badge>
+            <Badge tone="gray">≤ €{branch.threshold} → {tr(branch.under)} ({tr('skips')} {tr(tasks[branch.skipIdx].name)})</Badge>
           </div>
         )}
       </div>
@@ -118,8 +118,8 @@ export function WorkflowsView({ initialInstances, initialOpen = null }: { initia
                   <div className="row" style={{ gap: 8 }}>
                     <div style={{ width: 22, height: 22, borderRadius: 99, background: 'var(--accent-soft)', color: 'var(--accent-strong)', display: 'grid', placeItems: 'center', fontSize: 11, fontWeight: 700, flexShrink: 0 }}>{inst.task_idx + 1}</div>
                     <div>
-                      <div style={{ fontSize: 12.5, fontWeight: 500 }}>{tasks[inst.task_idx]?.name}</div>
-                      <div className="faint" style={{ fontSize: 10.5 }}>{tasks[inst.task_idx]?.role}</div>
+                      <div style={{ fontSize: 12.5, fontWeight: 500 }}>{tasks[inst.task_idx] && tr(tasks[inst.task_idx].name)}</div>
+                      <div className="faint" style={{ fontSize: 10.5 }}>{tasks[inst.task_idx] && tr(tasks[inst.task_idx].role)}</div>
                     </div>
                   </div>
                 </td>
@@ -234,7 +234,7 @@ function WorkflowRunner({ code, onBack, toast, go, onUpdate }: {
             <h2 style={{ margin: 0, fontSize: 19, fontWeight: 600 }} className="mono">{detail.code}</h2>
             <Badge tone={statusTone[detail.status]} dot>{tr(detail.status)}</Badge>
           </div>
-          <div className="muted" style={{ fontSize: 13, marginTop: 3 }}>{wf.name} · {detail.vendor}</div>
+          <div className="muted" style={{ fontSize: 13, marginTop: 3 }}>{tr(wf.name)} · {detail.vendor}</div>
         </div>
         <div className="spacer" />
         <button className="btn" onClick={() => go('invoices', detail.invoiceCode)}><I.invoice size={15} />{tr('View invoice')}</button>
@@ -294,8 +294,8 @@ function WorkflowRunner({ code, onBack, toast, go, onUpdate }: {
                   <div key={h.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '10px 20px', borderBottom: i < detail.history.length - 1 ? '1px solid var(--border)' : 'none' }}>
                     <div style={{ width: 8, height: 8, borderRadius: 99, background: ACTION_TONE_VAR(tone), marginTop: 5, flexShrink: 0 }} />
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 13 }}><span style={{ fontWeight: 600 }}>{h.actor_name}</span> <span className="muted">· {h.task_name}</span></div>
-                      <div style={{ fontSize: 12.5, color: ACTION_TONE_VAR(tone), fontWeight: 600, marginTop: 1 }}>{h.action_label}</div>
+                      <div style={{ fontSize: 13 }}><span style={{ fontWeight: 600 }}>{tr(h.actor_name)}</span> <span className="muted">· {tr(h.task_name)}</span></div>
+                      <div style={{ fontSize: 12.5, color: ACTION_TONE_VAR(tone), fontWeight: 600, marginTop: 1 }}>{tr(h.action_label)}</div>
                       {typeof fieldsOf(h.fields).com === 'string' && Boolean(fieldsOf(h.fields).com) && <div className="muted" style={{ fontSize: 12, marginTop: 3, fontStyle: 'italic' }}>&ldquo;{String(fieldsOf(h.fields).com)}&rdquo;</div>}
                     </div>
                     <span className="faint" style={{ fontSize: 11, whiteSpace: 'nowrap' }}><RelativeTime date={new Date(h.occurred_at)} /></span>
@@ -346,8 +346,8 @@ function WFTimeline({ tasks, taskIdx, terminal, isComplete, isPendingPmt, additi
               {!last && <div style={{ width: 2, flex: 1, minHeight: 40, background: done ? 'var(--green)' : 'var(--border)' }} />}
             </div>
             <div style={{ paddingBottom: last ? 0 : 22, flex: 1 }}>
-              <div style={{ fontSize: 13.5, fontWeight: 600 }}>{t.name}</div>
-              <div className="faint" style={{ fontSize: 11.5, marginBottom: 6 }}>{t.role}</div>
+              <div style={{ fontSize: 13.5, fontWeight: 600 }}>{tr(t.name)}</div>
+              <div className="faint" style={{ fontSize: 11.5, marginBottom: 6 }}>{tr(t.role)}</div>
               {skipped && <Badge tone="gray">{tr('Skipped')} · ≤ €{branch!.threshold}</Badge>}
               {!skipped && active && additionalPending && <Badge tone="violet" dot>{tr('Awaiting additional approval')}</Badge>}
               {!skipped && active && !additionalPending && <Badge tone="blue" dot>{tr('Current')}</Badge>}
@@ -383,11 +383,11 @@ function ActiveTaskCard({ task, taskIdx, selAction, onSelect, form, setField, in
         <div>
           <div className="row" style={{ gap: 9 }}>
             <div style={{ width: 24, height: 24, borderRadius: 99, background: 'var(--accent)', color: 'var(--on-accent)', display: 'grid', placeItems: 'center', fontSize: 12, fontWeight: 700 }}>{taskIdx + 1}</div>
-            <div className="card-title">{task.name}</div>
+            <div className="card-title">{tr(task.name)}</div>
           </div>
-          <div className="card-sub" style={{ marginTop: 6 }}>{task.desc}</div>
+          <div className="card-sub" style={{ marginTop: 6 }}>{tr(task.desc)}</div>
         </div>
-        <Badge tone="blue">{task.role}</Badge>
+        <Badge tone="blue">{tr(task.role)}</Badge>
       </div>
       <div className="card-pad">
         <div style={{ fontSize: 12, fontWeight: 600, letterSpacing: '0.04em', textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 11 }}>{tr('Choose an action')}</div>
@@ -404,7 +404,7 @@ function ActiveTaskCard({ task, taskIdx, selAction, onSelect, form, setField, in
                   color: on ? ACTION_TONE_VAR(a.tone) : 'var(--text-2)',
                   fontSize: 13, fontWeight: 600, transition: 'all 0.12s',
                 }}>
-                <Ico size={15} />{a.label}
+                <Ico size={15} />{tr(a.label)}
               </button>
             );
           })}
@@ -420,7 +420,7 @@ function ActiveTaskCard({ task, taskIdx, selAction, onSelect, form, setField, in
             <div className="row" style={{ gap: 10, marginTop: 22, justifyContent: 'flex-end' }}>
               <button className="btn" onClick={onCancel} disabled={submitting}>{tr('Cancel')}</button>
               <button className="btn" style={{ background: ACTION_TONE_VAR(action.tone), color: 'white', borderColor: 'transparent' }} onClick={onSubmit} disabled={submitting}>
-                <I.send size={15} />{submitting ? tr('Submitting…') : `${tr('Submit')} · ${action.label}`}
+                <I.send size={15} />{submitting ? tr('Submitting…') : `${tr('Submit')} · ${tr(action.label)}`}
               </button>
             </div>
           </div>
@@ -445,7 +445,7 @@ function WFFieldEl({ f, value, onChange, invoice, approvers }: {
   return (
     <div style={{ gridColumn: full ? '1 / -1' : 'auto' }}>
       <label style={{ fontSize: 11.5, fontWeight: 500, color: 'var(--text-2)', display: 'block', marginBottom: 6 }}>
-        {f.label}{f.required && <span style={{ color: 'var(--red)' }}> *</span>}
+        {tr(f.label)}{f.required && <span style={{ color: 'var(--red)' }}> *</span>}
         {isRO && <span className="faint" style={{ fontWeight: 400 }}> · {tr('from invoice')}</span>}
       </label>
       {isRO ? (
@@ -458,7 +458,7 @@ function WFFieldEl({ f, value, onChange, invoice, approvers }: {
       ) : f.type === 'select' ? (
         <select className="input" value={value || ''} onChange={e => onChange(e.target.value)}>
           <option value="">{tr('— Select —')}</option>
-          {options?.map(o => <option key={o} value={o}>{o}</option>)}
+          {options?.map(o => <option key={o} value={o}>{tr(o)}</option>)}
         </select>
       ) : f.type === 'currency' ? (
         <div style={{ position: 'relative' }}>
@@ -502,12 +502,12 @@ function AmountCheckCard({ amount, branch, submitting, onConfirm }: { amount: nu
         <div className="card" style={{ padding: '12px 16px', background: 'var(--accent-softer)', border: '1px solid var(--accent-soft)', marginBottom: 18 }}>
           <div className="row" style={{ gap: 10 }}>
             <I.zap size={17} style={{ color: 'var(--accent)' }} />
-            <span style={{ fontSize: 13 }}>{tr('This invoice will route to')} <strong>{dest}</strong>.</span>
+            <span style={{ fontSize: 13 }}>{tr('This invoice will route to')} <strong>{tr(dest)}</strong>.</span>
           </div>
         </div>
 
         <div className="row" style={{ justifyContent: 'flex-end' }}>
-          <button className="btn primary" onClick={onConfirm} disabled={submitting}><I.arrowR size={15} />{submitting ? tr('Routing…') : `${tr('Route to')} ${dest}`}</button>
+          <button className="btn primary" onClick={onConfirm} disabled={submitting}><I.arrowR size={15} />{submitting ? tr('Routing…') : `${tr('Route to')} ${tr(dest)}`}</button>
         </div>
       </div>
     </div>

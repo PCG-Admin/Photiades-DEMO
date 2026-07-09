@@ -99,7 +99,6 @@ export interface WorkflowInstanceRow {
   status: 'In Progress' | 'Info Requested' | 'Declined' | 'Completed' | 'Pending Payment' | 'Order not placed via PD';
   assignee_role: string;
   assignee_id: string | null;
-  return_task_idx: number | null;
   started_at: string;
   updated_at: string;
 }

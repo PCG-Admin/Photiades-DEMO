@@ -3,10 +3,12 @@
 import { I } from '@/components/icons';
 import { Badge } from '@/components/ui';
 import { RelativeTime } from '@/components/RelativeTime';
+import { useTr } from '@/lib/i18n';
 import type { ChainStep } from '@/lib/constants';
 
 // Vertical approval-chain timeline (shared by Invoice detail + Approvals)
 export function ApprovalChain({ steps }: { steps: ChainStep[]; amount?: number }) {
+  const tr = useTr();
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
       {steps.map((s, i) => {
@@ -28,11 +30,11 @@ export function ApprovalChain({ steps }: { steps: ChainStep[]; amount?: number }
             </div>
             <div style={{ paddingBottom: i < steps.length - 1 ? 16 : 0, flex: 1 }}>
               <div className="row" style={{ gap: 8 }}>
-                <span style={{ fontSize: 13, fontWeight: 600 }}>{s.name}</span>
+                <span style={{ fontSize: 13, fontWeight: 600 }}>{tr(s.name)}</span>
                 <span className="faint" style={{ fontSize: 11.5 }}>· {s.role}</span>
               </div>
               <div className="row" style={{ gap: 8, marginTop: 2 }}>
-                <Badge tone={done ? 'green' : active ? 'blue' : 'gray'}>{s.action}</Badge>
+                <Badge tone={done ? 'green' : active ? 'blue' : 'gray'}>{tr(s.action)}</Badge>
                 {s.when && <span className="faint" style={{ fontSize: 11.5 }}><RelativeTime date={s.when} /></span>}
               </div>
             </div>

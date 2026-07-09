@@ -59,8 +59,10 @@ export function ApprovalsView({ initialItems }: { initialItems: ApprovalInboxIte
                     padding: '14px 16px', transition: 'background 0.1s',
                   }}>
                   <div className="row" style={{ justifyContent: 'space-between', gap: 8 }}>
-                    <Badge tone="blue">{item.currentTaskName}</Badge>
-                    <Badge tone={prioTone[priority]} dot>{tr(priority)}</Badge>
+                    <Badge tone="blue">{tr(item.currentTaskName)}</Badge>
+                    {item.instance.status === 'Info Requested'
+                      ? <Badge tone="amber" dot>{tr('Info Requested')}</Badge>
+                      : <Badge tone={prioTone[priority]} dot>{tr(priority)}</Badge>}
                   </div>
                   <div style={{ fontWeight: 600, fontSize: 13.5, marginTop: 8, lineHeight: 1.35 }}>{item.vendor}</div>
                   <div className="row" style={{ justifyContent: 'space-between', marginTop: 8 }}>
@@ -82,7 +84,7 @@ export function ApprovalsView({ initialItems }: { initialItems: ApprovalInboxIte
                   <span className="mono" style={{ fontWeight: 600, color: 'var(--accent-strong)' }}>{sel.instance.code}</span>
                   <Badge tone={{ High: 'red', Medium: 'amber', Low: 'gray' }[priorityOf(sel.amount)]} dot>{tr(priorityOf(sel.amount))} {tr('priority')}</Badge>
                 </div>
-                <div className="card-title" style={{ marginTop: 6 }}>{sel.vendor} — {sel.currentTaskName}</div>
+                <div className="card-title" style={{ marginTop: 6 }}>{sel.vendor} — {tr(sel.currentTaskName)}</div>
               </div>
               <button className="btn ghost sm" onClick={() => go('invoices', sel.invoiceCode)}>{tr('View invoice')}<I.arrowR size={14} /></button>
             </div>
@@ -90,14 +92,20 @@ export function ApprovalsView({ initialItems }: { initialItems: ApprovalInboxIte
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 14, marginBottom: 24 }}>
                 <DetailField label={tr('Amount')} value={fmtMoney(sel.amount)} big />
                 <DetailField label={tr('Invoice')} value={sel.invoiceCode} mono />
-                <DetailField label={tr('Current task')} value={sel.currentTaskName} />
-                <DetailField label={tr('Assigned role')} value={sel.instance.assignee_role} />
+                <DetailField label={tr('Current task')} value={tr(sel.currentTaskName)} />
+                <DetailField label={tr('Assigned role')} value={tr(sel.instance.assignee_role)} />
                 <DetailField label={tr('Started')} value={<RelativeTime date={new Date(sel.instance.started_at)} />} />
                 <DetailField label={tr('Workflow')} value={sel.instance.wf_id === 'stock' ? tr('Stock') : tr('Non-Stock')} />
               </div>
-              <div className="card" style={{ padding: 14, background: 'var(--surface-2)', fontSize: 13, lineHeight: 1.6, color: 'var(--text-2)' }}>
-                {tr('Awaiting')} <strong>{sel.currentTaskName}</strong> — {tr('open Workflows to review the full task history and submit a decision.')}
-              </div>
+              {sel.instance.status === 'Info Requested' ? (
+                <div className="card" style={{ padding: 14, background: 'var(--amber-soft)', border: '1px solid var(--amber)', fontSize: 13, lineHeight: 1.6, color: 'var(--text)' }}>
+                  {tr('More information was requested — AP Clerk has been notified to update the invoice. This task stays assigned to you and can be actioned again once the invoice is updated.')}
+                </div>
+              ) : (
+                <div className="card" style={{ padding: 14, background: 'var(--surface-2)', fontSize: 13, lineHeight: 1.6, color: 'var(--text-2)' }}>
+                  {tr('Awaiting')} <strong>{tr(sel.currentTaskName)}</strong> — {tr('open Workflows to review the full task history and submit a decision.')}
+                </div>
+              )}
             </div>
             <div style={{ padding: 'var(--gap-4) var(--gap-5)', borderTop: '1px solid var(--border)' }}>
               <button className="btn primary" style={{ width: '100%' }} onClick={() => go('workflows')}><I.zap size={15} />{tr('Open in Workflows')}</button>

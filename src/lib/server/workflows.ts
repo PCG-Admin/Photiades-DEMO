@@ -234,11 +234,12 @@ export async function advanceWorkflowTask(instanceId: string, actionKey: string,
         if (fields.nonStkDoc) invoicePatch.non_stock_doc_number = String(fields.nonStkDoc);
         break;
       case 'requestInfo':
-        // Send to AP Clerk to fix/add the missing info, remembering where to
-        // resume so resubmitting doesn't re-run every approval that already
-        // happened before the question was raised (see requestInfo's resume
-        // handling in the 'default' branch below).
-        instancePatch = { status: 'Info Requested', task_idx: 0, return_task_idx: instance.task_idx, ...(await resolveAssignee(tasks[0].id, invoice.total, tasks[0].role)) };
+        // Stays parked at the current task — no reassignment, no restart of
+        // the approval chain. AP Clerk gets a separate notification (below,
+        // after the general assignee-notify block) pointing at the invoice,
+        // since fixing missing/wrong data happens on the invoice itself, not
+        // by acting on this workflow task.
+        instancePatch = { status: 'Info Requested' };
         break;
       case 'additional': {
         const approver = await findAppUserByName(String(fields.approver || ''));
@@ -248,15 +249,12 @@ export async function advanceWorkflowTask(instanceId: string, actionKey: string,
       default: {
         // forward transitions: approved / reviewed
         const amount = invoicePatch.total ?? invoice.total;
-        // Resuming from a Request Info round-trip — pick up where it left
-        // off instead of always advancing by one, and clear the resume
-        // point now that it's been used.
-        const nextIdx = instance.task_idx === 0 && instance.return_task_idx != null ? instance.return_task_idx : instance.task_idx + 1;
+        const nextIdx = instance.task_idx + 1;
         if (nextIdx >= tasks.length) {
-          instancePatch = { status: 'Completed', return_task_idx: null };
+          instancePatch = { status: 'Completed' };
           invoicePatch.status = 'Approved';
         } else {
-          instancePatch = { task_idx: nextIdx, status: 'In Progress', return_task_idx: null, ...(await resolveAssignee(tasks[nextIdx].id, amount, tasks[nextIdx].role)) };
+          instancePatch = { task_idx: nextIdx, status: 'In Progress', ...(await resolveAssignee(tasks[nextIdx].id, amount, tasks[nextIdx].role)) };
         }
       }
     }
@@ -280,6 +278,17 @@ export async function advanceWorkflowTask(instanceId: string, actionKey: string,
     });
   }
 
+  if (actionKey === 'requestInfo') {
+    // Points at the invoice, not the workflow task — AP Clerk's job here is
+    // fixing/adding data on the invoice itself, not acting on this task.
+    await notifyRole('AP Clerk', {
+      kind: 'declined', title: `More info needed on ${invoice.code}`,
+      detail: `${task.name} requested: ${String(fields.com ?? '').slice(0, 120) || 'see comment on the task'}`,
+      icon: 'alert', tone: 'amber',
+      ref_invoice_id: invoice.id, ref_instance_id: null,
+    });
+  }
+
   const { data: updatedInstance, error: reErr } = await supabase.from('workflow_instances').select('*').eq('id', instanceId).single()
     .overrideTypes<WorkflowInstanceRow, { merge: false }>();
   if (reErr) throw reErr;
@@ -290,8 +299,12 @@ export async function advanceWorkflowTask(instanceId: string, actionKey: string,
  * workflow_instances whose current task's role matches the caller's role;
  * never a separate table. */
 export async function getApprovalsInbox(userRole: string, userId: string): Promise<ApprovalInboxItem[]> {
+  // 'Info Requested' stays in the assignee's inbox too — requestInfo no
+  // longer reassigns the task, it just flags it while AP Clerk fixes the
+  // invoice, so the original approver still needs to see (and can still
+  // act on) it once that's done.
   const { data: instances, error } = await createServiceClient()
-    .from('workflow_instances').select('*').eq('status', 'In Progress').order('started_at')
+    .from('workflow_instances').select('*').in('status', ['In Progress', 'Info Requested']).order('started_at')
     .overrideTypes<WorkflowInstanceRow[], { merge: false }>();
   if (error) throw error;
 

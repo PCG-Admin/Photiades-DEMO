@@ -137,7 +137,7 @@ function InvoiceAgingReport() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--gap-5)' }}>
       {data && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 'var(--gap-4)' }}>
+        <div className="stagger" style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 'var(--gap-4)' }}>
           <MiniStat label={tr('Outstanding invoices')} value={totalCount} tone="blue" />
           <MiniStat label={tr('Total outstanding')} value={fmtMoney(totalOutstanding)} tone="violet" />
           <MiniStat label={tr('Overdue value')} value={fmtMoney(overdueTotal)} sub={tr('past due date')} tone="red" />
@@ -243,7 +243,7 @@ function DeclinedInvoicesReport() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--gap-5)' }}>
       {data && data.length > 0 && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 'var(--gap-4)' }}>
+        <div className="stagger" style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 'var(--gap-4)' }}>
           <MiniStat label={tr('Declined invoices')} value={data.length} tone="red" />
           <MiniStat label={tr('Total value declined')} value={fmtMoney(totalValue)} tone="red" />
         </div>
@@ -284,7 +284,7 @@ function PendingPaymentsReport() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--gap-5)' }}>
       {data && data.length > 0 && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 'var(--gap-4)' }}>
+        <div className="stagger" style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 'var(--gap-4)' }}>
           <MiniStat label={tr('Invoices pending payment')} value={data.length} tone="violet" />
           <MiniStat label={tr('Total awaiting the next run')} value={fmtMoney(total)} tone="violet" />
         </div>

@@ -228,7 +228,7 @@ export function AdminView({ initialUsers, initialMappings, initialPermissions }:
                 const approverUser = users.find(u => u.id === m.approver_user_id);
                 return (
                   <tr key={m.id}>
-                    <td style={{ fontSize: 13 }}>{task?.label ?? m.task_id}</td>
+                    <td style={{ fontSize: 13 }}>{task ? `${tr(task.workflowShort)} — ${tr(task.name)}` : m.task_id}</td>
                     <td className="muted" style={{ fontSize: 12.5 }}>
                       {m.min_amount == null && m.max_amount == null ? tr('Any amount')
                         : m.max_amount == null ? `${tr('Above')} ${fmtMoney(m.min_amount!)}`
@@ -324,7 +324,7 @@ function ApproverMappingModal({ users, saving, onClose, onSave }: {
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
         <div className="field"><label>{tr('Task')}</label>
           <select className="input" value={taskId} onChange={e => setTaskId(e.target.value)}>
-            {ASSIGNABLE_TASKS.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
+            {ASSIGNABLE_TASKS.map(t => <option key={t.id} value={t.id}>{tr(t.workflowShort)} — {tr(t.name)}</option>)}
           </select>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>

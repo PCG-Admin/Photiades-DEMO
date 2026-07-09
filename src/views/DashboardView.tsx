@@ -8,6 +8,7 @@ import { RelativeTime } from '@/components/RelativeTime';
 import { useCurrentUser } from '@/components/providers/CurrentUserProvider';
 import { useGo } from '@/lib/navigation';
 import { useTr } from '@/lib/i18n';
+import { fmtMoney } from '@/lib/utils';
 import type { DashboardData } from '@/lib/server/dashboard';
 import type { AuditEventRow } from '@/lib/supabase/types';
 
@@ -20,8 +21,8 @@ export function DashboardView({ data, recentActivity }: { data: DashboardData; r
   return (
     <div className="view-enter">
       <PageHeader
-        title={`Welcome, ${currentUser.name.split(' ')[0]}`}
-        sub={`${today} · Here's what needs your attention across the portal.`}
+        title={`${tr('Welcome,')} ${currentUser.name.split(' ')[0]}`}
+        sub={`${today} · ${tr("Here's what needs your attention across the portal.")}`}
         actions={<>
           <button className="btn" onClick={() => go('reports')}><I.reports size={16} />{tr('View reports')}</button>
           <button className="btn primary" onClick={() => go('capture')}><I.upload size={16} />{tr('Capture document')}</button>
@@ -29,12 +30,13 @@ export function DashboardView({ data, recentActivity }: { data: DashboardData; r
       />
 
       <div className="kpi-grid stagger" style={{ marginBottom: 'var(--gap-5)' }}>
-        <div style={{ animationDelay: '0ms' }}><Kpi label="Invoices captured" value={data.totalInvoices} icon={I.invoice} tone="teal" /></div>
-        <div style={{ animationDelay: '60ms' }}><Kpi label="Workflows in progress" value={data.inProgressWorkflows} icon={I.zap} tone="amber" /></div>
-        <div style={{ animationDelay: '120ms' }}><Kpi label="Invoices with exceptions" value={data.exceptions} icon={I.alert} tone="red" /></div>
+        <div style={{ animationDelay: '0ms' }}><Kpi label={tr('Invoices captured')} value={data.totalInvoices} icon={I.invoice} tone="teal" /></div>
+        <div style={{ animationDelay: '60ms' }}><Kpi label={tr('Workflows in progress')} value={data.inProgressWorkflows} icon={I.zap} tone="amber" /></div>
+        <div style={{ animationDelay: '120ms' }}><Kpi label={tr('Invoices with exceptions')} value={data.exceptions} icon={I.alert} tone="red" /></div>
+        <div style={{ animationDelay: '180ms' }}><Kpi label={tr('Total outstanding')} value={fmtMoney(data.totalOutstandingValue)} icon={I.building} tone="violet" /></div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1.6fr 1fr', gap: 'var(--gap-5)', marginBottom: 'var(--gap-5)' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1.3fr 0.85fr 0.85fr', gap: 'var(--gap-5)', marginBottom: 'var(--gap-5)' }}>
         {/* Workflow tasks */}
         <div className="card">
           <div className="card-head">
@@ -46,19 +48,20 @@ export function DashboardView({ data, recentActivity }: { data: DashboardData; r
           </div>
           <div className="card-pad">
             {data.workflowTasks.length === 0 ? (
-              <div className="faint" style={{ fontSize: 13 }}>No invoices in-flight yet.</div>
+              <div className="faint" style={{ fontSize: 13 }}>{tr('No invoices in-flight yet.')}</div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                 {data.workflowTasks.map((s) => {
                   const max = Math.max(...data.workflowTasks.map(t => t.count));
                   return (
                     <div key={s.stage} style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-                      <div style={{ width: 160, fontSize: 12.5, fontWeight: 500, color: 'var(--text-2)' }}>{s.stage}</div>
+                      <div style={{ width: 160, fontSize: 12.5, fontWeight: 500, color: 'var(--text-2)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flexShrink: 0 }} title={tr(s.stage)}>{tr(s.stage)}</div>
                       <div style={{ flex: 1, position: 'relative', height: 24 }}>
                         <div style={{
-                          position: 'absolute', inset: 0, width: `${(s.count / max) * 100}%`,
+                          position: 'absolute', inset: 0, width: `${Math.max(6, (s.count / max) * 100)}%`,
                           background: s.color, borderRadius: 6, opacity: 0.9,
                           display: 'flex', alignItems: 'center', justifyContent: 'flex-end', paddingRight: 9, minWidth: 30,
+                          transition: 'width 0.5s cubic-bezier(.22,1,.36,1)',
                         }}>
                           <span className="mono tnum" style={{ fontSize: 11.5, fontWeight: 600, color: 'white' }}>{s.count}</span>
                         </div>
@@ -78,7 +81,18 @@ export function DashboardView({ data, recentActivity }: { data: DashboardData; r
             <button className="icon-btn" onClick={() => go('invoices')}><I.arrowR size={16} /></button>
           </div>
           <div className="card-pad" style={{ display: 'grid', placeItems: 'center', paddingTop: 28 }}>
-            {data.statusMix.length === 0 ? <div className="faint" style={{ fontSize: 13 }}>No invoices yet.</div> : <Donut data={data.statusMix} size={158} thickness={24} />}
+            {data.statusMix.length === 0 ? <div className="faint" style={{ fontSize: 13 }}>{tr('No invoices yet.')}</div> : <Donut data={data.statusMix} size={130} thickness={20} />}
+          </div>
+        </div>
+
+        {/* Stock vs Non-stock mix donut */}
+        <div className="card">
+          <div className="card-head">
+            <div className="card-title">{tr('Stock vs Non-stock')}</div>
+            <button className="icon-btn" onClick={() => go('invoices')}><I.arrowR size={16} /></button>
+          </div>
+          <div className="card-pad" style={{ display: 'grid', placeItems: 'center', paddingTop: 28 }}>
+            {data.stockMix.length === 0 ? <div className="faint" style={{ fontSize: 13 }}>{tr('No invoices yet.')}</div> : <Donut data={data.stockMix} size={130} thickness={20} />}
           </div>
         </div>
       </div>
@@ -91,10 +105,10 @@ export function DashboardView({ data, recentActivity }: { data: DashboardData; r
             <Badge tone="amber">{data.inProgressWorkflows + data.exceptions} {tr('items')}</Badge>
           </div>
           <div style={{ padding: '6px 0' }}>
-            <ActionRow icon={I.approve} tone="blue" title={`${data.inProgressWorkflows} invoices awaiting a workflow decision`}
-              sub="Open Workflows to act" onClick={() => go('workflows')} />
-            <ActionRow icon={I.alert} tone="red" title={`${data.exceptions} invoices with exceptions`}
-              sub="Flagged during capture or review" onClick={() => go('invoices')} />
+            <ActionRow icon={I.approve} tone="blue" title={`${data.inProgressWorkflows} ${tr('invoices awaiting a workflow decision')}`}
+              sub={tr('Open Workflows to act')} onClick={() => go('workflows')} />
+            <ActionRow icon={I.alert} tone="red" title={`${data.exceptions} ${tr('invoices with exceptions')}`}
+              sub={tr('Flagged during capture or review')} onClick={() => go('invoices')} />
           </div>
         </div>
       </div>
@@ -106,7 +120,7 @@ export function DashboardView({ data, recentActivity }: { data: DashboardData; r
           <button className="btn ghost sm" onClick={() => go('audit')}>{tr('View audit trail')}<I.arrowR size={14} /></button>
         </div>
         <div style={{ padding: '8px 0' }}>
-          {recentActivity.length === 0 && <div className="faint" style={{ fontSize: 12.5, padding: '10px 20px' }}>No activity yet</div>}
+          {recentActivity.length === 0 && <div className="faint" style={{ fontSize: 12.5, padding: '10px 20px' }}>{tr('No activity yet')}</div>}
           {recentActivity.map((e) => <ActivityRow key={e.id} e={e} />)}
         </div>
       </div>

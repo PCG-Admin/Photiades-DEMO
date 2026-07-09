@@ -11,6 +11,12 @@ export type Lang = 'en' | 'el';
 
 export const TRANSLATIONS: Record<Exclude<Lang, 'en'>, Record<string, string>> = {
   el: {
+    // Generic yes/no picklists
+    'Yes': 'Ναι',
+    'No': 'Όχι',
+    'NA': 'Δ/Ε',
+    'Stock & Non Stock': 'Απόθεμα & Μη-απόθεμα',
+
     // Brand / chrome
     'Workflow Portal': 'Πύλη Ροής Εργασιών',
     'Portal': 'Πύλη',
@@ -82,6 +88,17 @@ export const TRANSLATIONS: Record<Exclude<Lang, 'en'>, Record<string, string>> =
     'View audit trail': 'Προβολή ιστορικού ελέγχου',
 
     // Dashboard
+    'Welcome,': 'Καλωσόρισες,',
+    "Here's what needs your attention across the portal.": 'Δείτε τι χρειάζεται την προσοχή σας στην πύλη.',
+    'invoices awaiting a workflow decision': 'τιμολόγια αναμένουν απόφαση ροής εργασίας',
+    'Open Workflows to act': 'Ανοίξτε τις Ροές εργασιών για ενέργεια',
+    'Flagged during capture or review': 'Επισημάνθηκαν κατά την καταχώρηση ή τον έλεγχο',
+    'No activity yet': 'Δεν υπάρχει ακόμη δραστηριότητα',
+    'Invoices captured': 'Καταχωρημένα τιμολόγια',
+    'Workflows in progress': 'Ροές εργασίας σε εξέλιξη',
+    'Invoices with exceptions': 'Τιμολόγια με εξαιρέσεις',
+    'No invoices in-flight yet.': 'Δεν υπάρχουν ακόμη ενεργά τιμολόγια.',
+    'No invoices yet.': 'Δεν υπάρχουν ακόμη τιμολόγια.',
     'Good morning, Elena': 'Καλημέρα, Έλενα',
     "Thursday, 29 May 2026 · Here's what needs your attention across the portal.":
       'Πέμπτη, 29 Μαΐου 2026 · Δείτε τι χρειάζεται την προσοχή σας στην πύλη.',
@@ -194,6 +211,8 @@ export const TRANSLATIONS: Record<Exclude<Lang, 'en'>, Record<string, string>> =
     'Awaiting': 'Αναμονή',
     'open Workflows to review the full task history and submit a decision.': 'ανοίξτε τις Ροές εργασιών για να δείτε το πλήρες ιστορικό και να υποβάλετε απόφαση.',
     'Open in Workflows': 'Άνοιγμα στις Ροές εργασιών',
+    'More information was requested — AP Clerk has been notified to update the invoice. This task stays assigned to you and can be actioned again once the invoice is updated.':
+      'Ζητήθηκαν πρόσθετες πληροφορίες — ο Υπάλληλος Λογιστηρίου Προμηθευτών ειδοποιήθηκε να ενημερώσει το τιμολόγιο. Αυτή η εργασία παραμένει ανατεθειμένη σε εσάς και μπορεί να ενεργηθεί ξανά μόλις ενημερωθεί το τιμολόγιο.',
     'Nothing selected': 'Δεν έχει επιλεγεί τίποτα',
     'Pick a request from the inbox': 'Επιλέξτε ένα αίτημα από τα εισερχόμενα',
 
@@ -441,6 +460,75 @@ export const TRANSLATIONS: Record<Exclude<Lang, 'en'>, Record<string, string>> =
     'has cleared all approval stages and is released for posting and payment.': 'έχει ολοκληρώσει όλα τα στάδια έγκρισης και έχει εκδοθεί για καταχώρηση και πληρωμή.',
     'The Accounts Department has approved this invoice and placed it on hold pending payment. It will be released to the payment run once funds are scheduled.':
       'Το Λογιστήριο ενέκρινε αυτό το τιμολόγιο και το έθεσε σε αναμονή πληρωμής. Θα ελευθερωθεί για πληρωμή μόλις προγραμματιστούν τα κεφάλαια.',
+
+    // Workflow definitions (src/lib/workflow.ts) — task/role/workflow names
+    // are fixed business vocabulary, but still rendered as regular UI text.
+    'Stock Invoice Workflow': 'Ροή Εργασίας Τιμολογίων Αποθέματος',
+    'Non-Stock Invoice Workflow': 'Ροή Εργασίας Τιμολογίων Μη-Αποθέματος',
+    'Stock Inv Imported': 'Εισαγωγή Τιμολογίου Αποθέματος',
+    'Non Stock Inv Imported': 'Εισαγωγή Τιμολογίου Μη-Αποθέματος',
+    'PurchDep-Approval': 'Έγκριση Τμήματος Αγορών',
+    'Amount check over 500': 'Έλεγχος ποσού άνω των 500',
+    'PurchMgr-Approval': 'Έγκριση Διευθυντή Αγορών',
+    'AM - AcDep-Review': 'Έλεγχος Διαχειριστή Λογαριασμού',
+    'AcMgr-Approval': 'Έγκριση Διευθυντή Λογιστηρίου',
+    'AcDep-Approval': 'Έγκριση Λογιστηρίου',
+    'Req/ner-Approval': 'Έγκριση Αιτούντος',
+
+    // Roles
+    'Purchasing Department': 'Τμήμα Αγορών',
+    'Purchasing Manager': 'Διευθυντής Αγορών',
+    'Account Manager': 'Διαχειριστής Λογαριασμού',
+    'Accounts Manager': 'Διευθυντής Λογιστηρίου',
+    'Accounts Department': 'Λογιστήριο',
+    'Requisitioner': 'Αιτών',
+
+    // Workflow instance statuses
+    'In Progress': 'Σε εξέλιξη',
+    'Info Requested': 'Ζητήθηκαν πληροφορίες',
+    'Completed': 'Ολοκληρώθηκε',
+
+    // Action labels
+    'Additional Approval': 'Πρόσθετη Έγκριση',
+    'Request Info': 'Αίτημα Πληροφοριών',
+    'Reviewed': 'Ελέγχθηκε',
+    'Pend. Pmt': 'Εκκρ. Πληρωμή',
+
+    // Field labels
+    'Comment when stored': 'Σχόλιο κατά την αποθήκευση',
+    'Comment': 'Σχόλιο',
+    'Is all documents attached / linked': 'Έχουν επισυναφθεί / συνδεθεί όλα τα έγγραφα',
+    'Select user to approve': 'Επιλέξτε χρήστη για έγκριση',
+    'Sent to Req/ner': 'Στάλθηκε στον Αιτούντα',
+    'Stk / Non-Stk': 'Απόθεμα / Μη-απόθεμα',
+
+    // Task descriptions
+    'Verify the imported stock invoice and confirm supporting documents before routing.':
+      'Επιβεβαιώστε το εισαγόμενο τιμολόγιο αποθέματος και τα συνοδευτικά έγγραφα πριν τη δρομολόγηση.',
+    'Purchasing department reviews the invoice and selects how to route it.':
+      'Το τμήμα αγορών ελέγχει το τιμολόγιο και επιλέγει πώς θα δρομολογηθεί.',
+    'Automatic threshold check. Invoices over €500 route to the Purchasing Manager; €500 and under route to the Account Manager.':
+      'Αυτόματος έλεγχος ορίου. Τιμολόγια άνω των €500 δρομολογούνται στον Διευθυντή Αγορών· €500 και κάτω στον Διαχειριστή Λογαριασμού.',
+    'Purchasing Manager approval for invoices over €500, before accounts review.':
+      'Έγκριση Διευθυντή Αγορών για τιμολόγια άνω των €500, πριν τον έλεγχο του λογιστηρίου.',
+    'Accounts Department review — confirm posting details and SAP invoice text.':
+      'Έλεγχος Λογιστηρίου — επιβεβαίωση στοιχείων καταχώρησης και κειμένου τιμολογίου SAP.',
+    'Final Accounts Manager approval to release the invoice.':
+      'Τελική έγκριση Διευθυντή Λογιστηρίου για την απελευθέρωση του τιμολογίου.',
+    'Accounts Department final approval — confirm document numbers before releasing for payment.':
+      'Τελική έγκριση Λογιστηρίου — επιβεβαίωση αριθμών εγγράφων πριν την απελευθέρωση για πληρωμή.',
+    'Verify the imported non-stock invoice and confirm where it should be routed for approval.':
+      'Επιβεβαιώστε το εισαγόμενο τιμολόγιο μη-αποθέματος και πού πρέπει να δρομολογηθεί για έγκριση.',
+    'The requisitioner reviews and approves the non-stock invoice.':
+      'Ο αιτών ελέγχει και εγκρίνει το τιμολόγιο μη-αποθέματος.',
+    'Purchasing department reviews the non-stock invoice and selects how to route it.':
+      'Το τμήμα αγορών ελέγχει το τιμολόγιο μη-αποθέματος και επιλέγει πώς θα δρομολογηθεί.',
+    'Automatic threshold check. Invoices over €500 route to the Purchasing Manager; €500 and under route to FM.':
+      'Αυτόματος έλεγχος ορίου. Τιμολόγια άνω των €500 δρομολογούνται στον Διευθυντή Αγορών· €500 και κάτω στον Διευθυντή Οικονομικών.',
+    'Purchasing Manager approval for non-stock invoices over €500, before accounts review.':
+      'Έγκριση Διευθυντή Αγορών για τιμολόγια μη-αποθέματος άνω των €500, πριν τον έλεγχο του λογιστηρίου.',
+    'Final Accounts Manager approval to release the non-stock invoice.':
+      'Τελική έγκριση Διευθυντή Λογιστηρίου για την απελευθέρωση του τιμολογίου μη-αποθέματος.',
   },
 };
 

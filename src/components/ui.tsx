@@ -15,10 +15,10 @@ export function MiniStat({ label, value, sub, tone }: {
 }) {
   const toneVar = TONE_VAR[tone] ?? 'var(--accent)';
   return (
-    <div className="card" style={{ padding: '14px 18px', borderLeft: `3px solid ${toneVar}` }}>
+    <div className="card ministat" style={{ padding: '15px 18px', borderLeft: `3px solid ${toneVar}` }}>
       <div className="muted" style={{ fontSize: 12, fontWeight: 500 }}>{label}</div>
-      <div style={{ fontSize: 21, fontWeight: 600, marginTop: 5, fontFamily: 'var(--mono)', letterSpacing: '-0.01em' }}>{value}</div>
-      {sub && <div className="faint" style={{ fontSize: 11.5, marginTop: 2 }}>{sub}</div>}
+      <div style={{ fontSize: 22, fontWeight: 650, marginTop: 6, fontFamily: 'var(--mono)', letterSpacing: '-0.02em' }}>{value}</div>
+      {sub && <div className="faint" style={{ fontSize: 11.5, marginTop: 3 }}>{sub}</div>}
     </div>
   );
 }
@@ -94,12 +94,11 @@ export function Kpi({ label, value, delta, deltaDir, icon, tone = 'blue', sub }:
 }) {
   const Ico = icon;
   const toneVar = ({ blue: 'var(--accent)', green: 'var(--green)', amber: 'var(--amber)', red: 'var(--red)', violet: 'var(--violet)', teal: 'var(--teal)' } as Record<string, string>)[tone];
-  const softVar = ({ blue: 'var(--accent-soft)', green: 'var(--green-soft)', amber: 'var(--amber-soft)', red: 'var(--red-soft)', violet: 'var(--violet-soft)', teal: 'var(--teal-soft)' } as Record<string, string>)[tone];
   return (
-    <div className="card kpi">
+    <div className="card kpi" style={{ '--kpi-tone': toneVar } as React.CSSProperties}>
       <div className="row" style={{ justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div className="kpi-label">{label}</div>
-        {Ico && <div className="kpi-icon" style={{ background: softVar, color: toneVar }}><Ico size={18} /></div>}
+        {Ico && <div className="kpi-icon"><Ico size={17} /></div>}
       </div>
       <div className="kpi-val">{value}</div>
       <div className="row" style={{ gap: 8 }}>

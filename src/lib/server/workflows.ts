@@ -15,6 +15,10 @@ export interface WorkflowInstanceWithHistory extends WorkflowInstanceRow {
   history: WorkflowHistoryRow[];
 }
 
+/** WFTask roles on the procurement side of the chain — see requestInfo's
+ * auto-routing below. */
+const PROCUREMENT_TASK_ROLES = new Set(['Purchasing Department', 'Purchasing Manager', 'Requisitioner']);
+
 /** Resolves who a task should be assigned to: a configured approver_mappings
  * row for this task+amount takes priority (T169 — admin-configurable
  * routing), falling back to the task's fixed WFTask.role when no mapping
@@ -279,9 +283,14 @@ export async function advanceWorkflowTask(instanceId: string, actionKey: string,
   }
 
   if (actionKey === 'requestInfo') {
-    // Points at the invoice, not the workflow task — AP Clerk's job here is
-    // fixing/adding data on the invoice itself, not acting on this task.
-    await notifyRole('AP Clerk', {
+    // Auto-routed by who's asking: a Purchasing-side task (Purchasing
+    // Department/Manager, Requisitioner) is usually missing invoice/vendor
+    // data that AP Clerk owns, while an Accounts-side task is usually
+    // missing a PO/goods-receipt detail that Purchasing Department owns.
+    // Points at the invoice, not the workflow task — the recipient's job
+    // is fixing/adding data on the invoice itself, not acting on this task.
+    const target = PROCUREMENT_TASK_ROLES.has(task.role) ? 'AP Clerk' : 'Purchasing Department';
+    await notifyRole(target, {
       kind: 'declined', title: `More info needed on ${invoice.code}`,
       detail: `${task.name} requested: ${String(fields.com ?? '').slice(0, 120) || 'see comment on the task'}`,
       icon: 'alert', tone: 'amber',

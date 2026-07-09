@@ -3,9 +3,11 @@
 import { createServiceClient } from '@/lib/supabase/service';
 import { genInvoiceCode } from '@/lib/server/codes';
 import { getCurrentAppUser } from '@/lib/server/users';
-import { createWorkflowInstance } from '@/lib/server/workflows';
+import { createWorkflowInstance, getWorkflowInstanceForInvoice } from '@/lib/server/workflows';
 import { recordAuditEvent } from '@/lib/server/audit';
+import { notifyRole } from '@/lib/server/notifications';
 import { uploadInvoiceDocument, getDocumentUrl } from '@/lib/server/storage';
+import { wfById } from '@/lib/workflow';
 import type { InvoiceRow, InvoiceLineItemRow, AuditChange } from '@/lib/supabase/types';
 
 export interface InvoiceWithLineItems extends InvoiceRow {
@@ -110,6 +112,24 @@ export async function updateInvoiceFields(id: string, patch: Partial<InvoiceRow>
       icon: 'edit',
       tone: 'amber',
     });
+
+    // Closes the loop on Request Info: the task was left parked with its
+    // original approver rather than reassigned to AP Clerk, so once AP
+    // Clerk's fix lands here we flip the flag back and let the approver
+    // know it's ready to action again — nothing else would ever tell them.
+    const instance = await getWorkflowInstanceForInvoice(id);
+    if (instance && instance.status === 'Info Requested') {
+      const task = wfById(instance.wf_id).tasks[instance.task_idx];
+      const { error: resumeErr } = await supabase.from('workflow_instances')
+        .update({ status: 'In Progress' } as never).eq('id', instance.id);
+      if (resumeErr) throw resumeErr;
+      await notifyRole(instance.assignee_role, {
+        kind: 'task', title: `${after.code} updated — ready to review`,
+        detail: `${task.name} can be actioned again.`,
+        icon: 'check', tone: 'blue',
+        ref_invoice_id: after.id, ref_instance_id: instance.id,
+      });
+    }
   }
   return after;
 }

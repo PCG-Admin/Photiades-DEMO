@@ -6,7 +6,7 @@
 export type StockType = 'Stock' | 'Non-stock' | 'Stock & Non Stock';
 export const STOCK_TYPES: StockType[] = ['Stock', 'Non-stock', 'Stock & Non Stock'];
 export const COMPANY_CODES = ['1000', '2000', '3000', '4000'];
-export const ROLES = ['Administrator', 'AP Manager', 'AP Clerk', 'Approver', 'Auditor', 'Viewer'];
+export const ROLES = ['Administrator', 'AP Manager', 'AP Clerk', 'Approver', 'Auditor', 'Viewer', 'Purchasing Department'];
 export const DEPTS = ['Finance', 'Operations', 'Procurement', 'Marketing', 'IT', 'Logistics', 'Executive'];
 
 export interface ChainStep {

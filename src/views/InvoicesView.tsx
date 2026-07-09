@@ -24,6 +24,12 @@ import { errorMessage } from '@/lib/errorMessage';
 
 const isOverdue = (inv: InvoiceRow) => new Date(inv.due_at) < new Date() && !['Paid', 'Paid Invoice', 'Approved'].includes(inv.status);
 
+// WorkflowHistoryRow.fields is jsonb (typed as Json); every history row this
+// app writes is a flat string/number map, so treat it as one for display.
+function fieldsOf(fields: unknown): Record<string, unknown> {
+  return typeof fields === 'object' && fields !== null ? fields as Record<string, unknown> : {};
+}
+
 export function InvoicesView({ initialInvoices, initialId = null }: { initialInvoices: InvoiceRow[]; initialId?: string | null }) {
   const tr = useTr();
   const [invoices, setInvoices] = useState<InvoiceRow[]>(initialInvoices);
@@ -218,6 +224,12 @@ function InvoiceDetail({ code, onBack, onSave, onDelete }: {
   const chainSteps = instance ? instance.history.map(h => ({
     role: h.actor_name, name: h.task_name, action: h.action_label, when: new Date(h.occurred_at),
   })) : [];
+  // Surfaces the actual Request Info comment right on the invoice screen —
+  // otherwise the only trace of it is a truncated notification, and the
+  // approval-chain panel below only shows the action label, not the text.
+  const lastInfoRequest = instance?.status === 'Info Requested'
+    ? [...instance.history].reverse().find(h => h.action_key === 'requestInfo')
+    : undefined;
 
   function handleSave(updated: InvoiceRow) {
     setInv(prev => prev ? { ...prev, ...updated } : prev);
@@ -281,6 +293,23 @@ function InvoiceDetail({ code, onBack, onSave, onDelete }: {
           <ul style={{ margin: '10px 0 0', paddingLeft: 28, fontSize: 13, color: 'var(--text-2)', display: 'flex', flexDirection: 'column', gap: 4 }}>
             {inv.flags.map((f, i) => <li key={i}>{f}</li>)}
           </ul>
+        </div>
+      )}
+
+      {lastInfoRequest && (
+        <div className="card" style={{ borderColor: 'var(--amber)', background: 'var(--amber-soft)', marginBottom: 'var(--gap-5)', padding: '14px 18px' }}>
+          <div className="row" style={{ gap: 10, color: 'var(--text)' }}>
+            <I.alert size={18} style={{ flexShrink: 0, color: 'var(--amber)' }} />
+            <span style={{ fontWeight: 600, fontSize: 13.5 }}>
+              {tr('More information requested')} — {tr(lastInfoRequest.task_name)} ({lastInfoRequest.actor_name})
+            </span>
+            <span className="faint" style={{ fontSize: 11.5, marginLeft: 'auto' }}><RelativeTime date={new Date(lastInfoRequest.occurred_at)} /></span>
+          </div>
+          {typeof fieldsOf(lastInfoRequest.fields).com === 'string' && (
+            <div style={{ marginTop: 8, fontSize: 13, lineHeight: 1.5, color: 'var(--text-2)' }}>
+              &ldquo;{String(fieldsOf(lastInfoRequest.fields).com)}&rdquo;
+            </div>
+          )}
         </div>
       )}
 

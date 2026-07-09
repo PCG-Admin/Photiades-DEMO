@@ -483,6 +483,8 @@ export const TRANSLATIONS: Record<Exclude<Lang, 'en'>, Record<string, string>> =
     'Accounts Department': 'Λογιστήριο',
     'Requisitioner': 'Αιτών',
 
+    'More information requested': 'Ζητήθηκαν περισσότερες πληροφορίες',
+
     // Workflow instance statuses
     'In Progress': 'Σε εξέλιξη',
     'Info Requested': 'Ζητήθηκαν πληροφορίες',

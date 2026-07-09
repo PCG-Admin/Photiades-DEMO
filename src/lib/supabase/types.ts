@@ -19,7 +19,7 @@ export interface AppUserRow {
   id: string;
   name: string;
   email: string;
-  role: 'Administrator' | 'AP Manager' | 'AP Clerk' | 'Approver' | 'Auditor' | 'Viewer';
+  role: 'Administrator' | 'AP Manager' | 'AP Clerk' | 'Approver' | 'Auditor' | 'Viewer' | 'Purchasing Department';
   dept: string;
   status: 'Active' | 'Inactive';
   mfa_enabled: boolean;

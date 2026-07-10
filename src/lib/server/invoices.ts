@@ -21,6 +21,24 @@ export async function getInvoices(): Promise<InvoiceRow[]> {
   return data;
 }
 
+/** Backs the topbar search box — matches on the fields a user would
+ * actually type: the invoice/workflow code, vendor name, PO number,
+ * invoice number, or vendor reference. Commas/parens are stripped since
+ * they're PostgREST's `.or()` filter-syntax separators, not something a
+ * search query should be parsed as. */
+export async function searchInvoices(query: string): Promise<InvoiceRow[]> {
+  const q = query.trim().replace(/[,()]/g, ' ').trim();
+  if (q.length < 2) return [];
+  const { data, error } = await createServiceClient()
+    .from('invoices').select('*')
+    .or(`code.ilike.%${q}%,vendor.ilike.%${q}%,invoice_no.ilike.%${q}%,po.ilike.%${q}%,vendor_ref.ilike.%${q}%`)
+    .order('created_at', { ascending: false })
+    .limit(8)
+    .overrideTypes<InvoiceRow[], { merge: false }>();
+  if (error) throw error;
+  return data;
+}
+
 export async function getInvoiceByCode(code: string): Promise<InvoiceWithLineItems | null> {
   const supabase = createServiceClient();
   const { data: invoice, error } = await supabase.from('invoices').select('*').eq('code', code).single()

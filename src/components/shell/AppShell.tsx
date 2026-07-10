@@ -5,17 +5,19 @@ import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { I, IconComponent } from '@/components/icons';
-import { Avatar, IconBtn, Modal } from '@/components/ui';
+import { Avatar, IconBtn, Modal, StatusBadge } from '@/components/ui';
 import { useRouter } from 'next/navigation';
-import { cx } from '@/lib/utils';
+import { cx, fmtMoney } from '@/lib/utils';
 import { useTheme } from '@/components/providers/ThemeProvider';
 import { useCurrentUser } from '@/components/providers/CurrentUserProvider';
 import { useToast } from '@/components/providers/ToastProvider';
+import { useGo } from '@/lib/navigation';
 import { logout } from '@/lib/server/auth-actions';
 import { listAppUsers, type CurrentAppUser } from '@/lib/server/users';
+import { searchInvoices } from '@/lib/server/invoices';
 import { getMyDelegation, setMyDelegation, clearMyDelegation } from '@/lib/server/delegations';
 import { errorMessage } from '@/lib/errorMessage';
-import type { AppUserRow } from '@/lib/supabase/types';
+import type { AppUserRow, InvoiceRow } from '@/lib/supabase/types';
 import { useTr } from '@/lib/i18n';
 
 interface NavItem { key: string; label: string; icon: IconComponent; count?: number }
@@ -128,11 +130,7 @@ export function AppShell({ children, unreadCount, accessibleModules }: { childre
             <h1>{tr(TITLES[route] ?? 'Dashboard')}</h1>
           </div>
           <div className="spacer" />
-          <div className="search">
-            <I.search size={16} />
-            <input placeholder={tr('Search invoices, documents, vendors…')} />
-            <kbd>⌘K</kbd>
-          </div>
+          <TopbarSearch />
           <div className="seg" style={{ marginRight: 2 }} title={tr('Language')}>
             <button className={cx(t.lang !== 'el' && 'on')} onClick={() => setTweak('lang', 'en')}>EN</button>
             <button className={cx(t.lang === 'el' && 'on')} onClick={() => setTweak('lang', 'el')}>ΕΛ</button>
@@ -162,6 +160,85 @@ export function AppShell({ children, unreadCount, accessibleModules }: { childre
           onOpenDelegation={() => setDelegationOpen(true)} />
       )}
       {delegationOpen && <DelegationModal currentUserId={currentUser.id} onClose={() => setDelegationOpen(false)} />}
+    </div>
+  );
+}
+
+function TopbarSearch() {
+  const tr = useTr();
+  const go = useGo();
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [query, setQuery] = useState('');
+  const [results, setResults] = useState<InvoiceRow[]>([]);
+  const [open, setOpen] = useState(false);
+  const [searching, setSearching] = useState(false);
+
+  // ⌘K / Ctrl+K focuses the box from anywhere, matching the hint shown in it.
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        inputRef.current?.focus();
+      }
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
+  useEffect(() => {
+    const q = query.trim();
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (q.length < 2) { setResults([]); setSearching(false); return; }
+    setSearching(true);
+    const handle = setTimeout(() => {
+      searchInvoices(q).then(r => { setResults(r); setSearching(false); });
+    }, 250);
+    return () => clearTimeout(handle);
+  }, [query]);
+
+  function pick(code: string) {
+    go('invoices', code);
+    setQuery('');
+    setResults([]);
+    setOpen(false);
+    inputRef.current?.blur();
+  }
+
+  const showDropdown = open && query.trim().length >= 2;
+
+  return (
+    <div className="search" style={{ position: 'relative' }}>
+      <I.search size={16} />
+      <input ref={inputRef} value={query} placeholder={tr('Search invoices, documents, vendors…')}
+        onChange={e => { setQuery(e.target.value); setOpen(true); }}
+        onFocus={() => setOpen(true)}
+        onBlur={() => setTimeout(() => setOpen(false), 120)}
+        onKeyDown={(e) => { if (e.key === 'Enter' && results.length > 0) pick(results[0].code); if (e.key === 'Escape') { setOpen(false); inputRef.current?.blur(); } }} />
+      <kbd>⌘K</kbd>
+
+      {showDropdown && (
+        <div className="card" style={{ position: 'absolute', top: 'calc(100% + 6px)', left: 0, right: 0, zIndex: 50, overflow: 'hidden', boxShadow: 'var(--shadow-lg)' }}>
+          {searching ? (
+            <div className="faint" style={{ padding: '12px 14px', fontSize: 12.5 }}>{tr('Searching…')}</div>
+          ) : results.length === 0 ? (
+            <div className="faint" style={{ padding: '12px 14px', fontSize: 12.5 }}>{tr('No matches')}</div>
+          ) : (
+            results.map((inv, i) => (
+              <button key={inv.id} onMouseDown={(e) => { e.preventDefault(); pick(inv.code); }}
+                style={{ display: 'flex', width: '100%', justifyContent: 'space-between', alignItems: 'center', gap: 10, padding: '9px 14px', border: 'none', background: 'none', textAlign: 'left', borderTop: i > 0 ? '1px solid var(--border)' : 'none' }}>
+                <div style={{ minWidth: 0 }}>
+                  <div className="row" style={{ gap: 8 }}>
+                    <span className="mono" style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--accent-strong)' }}>{inv.code}</span>
+                    <StatusBadge status={inv.status} />
+                  </div>
+                  <div style={{ fontSize: 12.5, marginTop: 2 }}>{inv.vendor}{inv.po ? ` · ${inv.po}` : ''}</div>
+                </div>
+                <span className="mono" style={{ fontSize: 12.5, fontWeight: 600, flexShrink: 0 }}>{fmtMoney(inv.total)}</span>
+              </button>
+            ))
+          )}
+        </div>
+      )}
     </div>
   );
 }

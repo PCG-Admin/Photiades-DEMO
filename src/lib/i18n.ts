@@ -23,6 +23,8 @@ export const TRANSLATIONS: Record<Exclude<Lang, 'en'>, Record<string, string>> =
     'Storage': 'Αποθηκευτικός χώρος',
     '64% of 2 TB · 1.28 TB used': '64% από 2 TB · 1,28 TB σε χρήση',
     'Search invoices, documents, vendors…': 'Αναζήτηση τιμολογίων, εγγράφων, προμηθευτών…',
+    'Searching…': 'Αναζήτηση…',
+    'No matches': 'Δεν βρέθηκαν αποτελέσματα',
     'Toggle theme': 'Εναλλαγή θέματος',
     'Notifications': 'Ειδοποιήσεις',
     'Language': 'Γλώσσα',

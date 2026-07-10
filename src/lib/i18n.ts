@@ -211,20 +211,29 @@ export const TRANSLATIONS: Record<Exclude<Lang, 'en'>, Record<string, string>> =
     'Awaiting': 'Αναμονή',
     'open Workflows to review the full task history and submit a decision.': 'ανοίξτε τις Ροές εργασιών για να δείτε το πλήρες ιστορικό και να υποβάλετε απόφαση.',
     'Open in Workflows': 'Άνοιγμα στις Ροές εργασιών',
-    'More information was requested — AP Clerk has been notified to update the invoice. This task stays assigned to you and can be actioned again once the invoice is updated.':
-      'Ζητήθηκαν πρόσθετες πληροφορίες — ο Υπάλληλος Λογιστηρίου Προμηθευτών ειδοποιήθηκε να ενημερώσει το τιμολόγιο. Αυτή η εργασία παραμένει ανατεθειμένη σε εσάς και μπορεί να ενεργηθεί ξανά μόλις ενημερωθεί το τιμολόγιο.',
+    'This was sent back to you because a later step needs more information — check the invoice for what was asked, fix it, then submit your decision again.':
+      'Αυτό επεστράφη σε εσάς επειδή ένα επόμενο βήμα χρειάζεται περισσότερες πληροφορίες — δείτε στο τιμολόγιο τι ζητήθηκε, διορθώστε το και υποβάλετε ξανά την απόφασή σας.',
     'Nothing selected': 'Δεν έχει επιλεγεί τίποτα',
     'Pick a request from the inbox': 'Επιλέξτε ένα αίτημα από τα εισερχόμενα',
 
     // Document Capture
     'Upload a document to capture and index it into the portal.': 'Μεταφορτώστε ένα έγγραφο για καταχώρηση και ευρετηρίαση στην πύλη.',
+    'Upload one or more documents to capture and index them into the portal.': 'Μεταφορτώστε ένα ή περισσότερα έγγραφα για καταχώρηση και ευρετηρίαση στην πύλη.',
     'Drop a document to capture': 'Αφήστε ένα έγγραφο για καταχώρηση',
+    'Drop one or more documents to capture': 'Αφήστε ένα ή περισσότερα έγγραφα για καταχώρηση',
     'or click to browse · PDF, PNG, JPG, WEBP. Fields are auto-extracted and the Store form opens for review.':
       'ή κάντε κλικ για περιήγηση · PDF, PNG, JPG, WEBP. Τα πεδία εξάγονται αυτόματα και ανοίγει η φόρμα αποθήκευσης για έλεγχο.',
+    'or click to browse · PDF, PNG, JPG, WEBP. Select several files at once to queue them — fields are auto-extracted and each opens for review in turn.':
+      'ή κάντε κλικ για περιήγηση · PDF, PNG, JPG, WEBP. Επιλέξτε πολλά αρχεία ταυτόχρονα για να μπουν σε ουρά — τα πεδία εξάγονται αυτόματα και το καθένα ανοίγει για έλεγχο με τη σειρά του.',
+    'Just stored': 'Μόλις αποθηκεύτηκαν',
     'Reset': 'Επαναφορά',
     'extracted': 'εξήχθησαν',
     'Storing…': 'Αποθήκευση…',
     'Store': 'Αποθήκευση',
+    'Store & Next': 'Αποθήκευση & Επόμενο',
+    'Add more': 'Προσθήκη περισσότερων',
+    'This looks like the same invoice as': 'Αυτό μοιάζει με το ίδιο τιμολόγιο με',
+    'already queued in this same upload.': 'που βρίσκεται ήδη σε αναμονή σε αυτή την ίδια μεταφόρτωση.',
     'Extracting fields…': 'Εξαγωγή πεδίων…',
     'fill in the fields manually below.': 'συμπληρώστε τα πεδία χειροκίνητα παρακάτω.',
     'Checking for duplicates…': 'Έλεγχος για διπλότυπα…',
@@ -432,6 +441,11 @@ export const TRANSLATIONS: Record<Exclude<Lang, 'en'>, Record<string, string>> =
     'skips': 'παραλείπει',
     'In-flight workflows': 'Ενεργές ροές εργασίας',
     'No instances yet': 'Δεν υπάρχουν ακόμη περιπτώσεις',
+    'Empty': 'Κενό',
+    'System · auto': 'Σύστημα · αυτόματο',
+    'Recently resolved': 'Πρόσφατα ολοκληρωμένα',
+    'Info req.': 'Αίτημα πληρ.',
+    'Complete': 'Ολοκληρώθηκε',
     'Loading workflow…': 'Φόρτωση ροής εργασίας…',
     'Workflow history': 'Ιστορικό ροής εργασίας',
     'No actions yet': 'Δεν υπάρχουν ακόμη ενέργειες',

@@ -9,15 +9,11 @@ import { resolveApproverForTask } from '@/lib/server/approverMappings';
 import { getUsersWhoDelegatedToMe } from '@/lib/server/delegations';
 import { recordAuditEvent } from '@/lib/server/audit';
 import { notifyRole } from '@/lib/server/notifications';
-import type { WorkflowInstanceRow, WorkflowHistoryRow, InvoiceRow } from '@/lib/supabase/types';
+import type { WorkflowInstanceRow, WorkflowHistoryRow, InvoiceRow, AuditChange } from '@/lib/supabase/types';
 
 export interface WorkflowInstanceWithHistory extends WorkflowInstanceRow {
   history: WorkflowHistoryRow[];
 }
-
-/** WFTask roles on the procurement side of the chain — see requestInfo's
- * auto-routing below. */
-const PROCUREMENT_TASK_ROLES = new Set(['Purchasing Department', 'Purchasing Manager', 'Requisitioner']);
 
 /** Resolves who a task should be assigned to: a configured approver_mappings
  * row for this task+amount takes priority (T169 — admin-configurable
@@ -237,14 +233,17 @@ export async function advanceWorkflowTask(instanceId: string, actionKey: string,
         if (fields.stkDoc) invoicePatch.stock_doc_number = String(fields.stkDoc);
         if (fields.nonStkDoc) invoicePatch.non_stock_doc_number = String(fields.nonStkDoc);
         break;
-      case 'requestInfo':
-        // Stays parked at the current task — no reassignment, no restart of
-        // the approval chain. AP Clerk gets a separate notification (below,
-        // after the general assignee-notify block) pointing at the invoice,
-        // since fixing missing/wrong data happens on the invoice itself, not
-        // by acting on this workflow task.
-        instancePatch = { status: 'Info Requested' };
+      case 'requestInfo': {
+        // Sends the task back to whoever handled the immediately preceding
+        // human task (skipping auto/branch routing steps like Amount
+        // Check) — that's whoever actually owns the data being questioned.
+        // Once they fix it and act again, the normal forward transition
+        // below carries it right back to this task.
+        let prevIdx = instance.task_idx - 1;
+        while (prevIdx > 0 && tasks[prevIdx].auto) prevIdx--;
+        instancePatch = { task_idx: prevIdx, status: 'Info Requested', ...(await resolveAssignee(tasks[prevIdx].id, invoice.total, tasks[prevIdx].role)) };
         break;
+      }
       case 'additional': {
         const approver = await findAppUserByName(String(fields.approver || ''));
         instancePatch = { assignee_id: approver?.id ?? null };
@@ -264,6 +263,14 @@ export async function advanceWorkflowTask(instanceId: string, actionKey: string,
     }
   }
 
+  // Diffs whatever this action changed on the invoice directly (e.g. task 1's
+  // inline invNo/po/amount fields, or pendPmt's doc numbers) so the fix is
+  // visible as a highlighted before/after, same as manual invoice edits —
+  // this is what makes a correction after Request Info clearly show up.
+  const invoiceChanges: AuditChange[] = Object.keys(invoicePatch)
+    .filter(key => invoicePatch[key as keyof InvoiceRow] !== invoice[key as keyof InvoiceRow])
+    .map(key => ({ field: key, before: invoice[key as keyof InvoiceRow], after: invoicePatch[key as keyof InvoiceRow] }));
+
   const { error: updErr } = await supabase.from('workflow_instances').update(instancePatch as never).eq('id', instanceId);
   if (updErr) throw updErr;
 
@@ -272,30 +279,29 @@ export async function advanceWorkflowTask(instanceId: string, actionKey: string,
     if (invUpdErr) throw invUpdErr;
   }
 
-  await recordAuditEvent({ action: auditAction, module: 'Workflows', target: invoice.code, invoiceId: invoice.id, icon: 'zap', tone: 'blue' });
+  await recordAuditEvent({
+    action: auditAction, module: 'Workflows', target: invoice.code, invoiceId: invoice.id, icon: 'zap', tone: 'blue',
+    changes: invoiceChanges.length > 0 ? invoiceChanges : undefined,
+  });
 
   if (instancePatch.assignee_role && instancePatch.status !== 'Completed') {
-    await notifyRole(instancePatch.assignee_role, {
-      kind: 'task', title: `${tasks[instancePatch.task_idx ?? instance.task_idx].name} awaiting action`,
-      detail: `${invoice.vendor} — ${invoice.code}`, icon: 'zap', tone: 'blue',
-      ref_invoice_id: invoice.id, ref_instance_id: instanceId,
-    });
-  }
-
-  if (actionKey === 'requestInfo') {
-    // Auto-routed by who's asking: a Purchasing-side task (Purchasing
-    // Department/Manager, Requisitioner) is usually missing invoice/vendor
-    // data that AP Clerk owns, while an Accounts-side task is usually
-    // missing a PO/goods-receipt detail that Purchasing Department owns.
-    // Points at the invoice, not the workflow task — the recipient's job
-    // is fixing/adding data on the invoice itself, not acting on this task.
-    const target = PROCUREMENT_TASK_ROLES.has(task.role) ? 'AP Clerk' : 'Purchasing Department';
-    await notifyRole(target, {
-      kind: 'declined', title: `More info needed on ${invoice.code}`,
-      detail: `${task.name} requested: ${String(fields.com ?? '').slice(0, 120) || 'see comment on the task'}`,
-      icon: 'alert', tone: 'amber',
-      ref_invoice_id: invoice.id, ref_instance_id: null,
-    });
+    const targetTask = tasks[instancePatch.task_idx ?? instance.task_idx];
+    if (actionKey === 'requestInfo') {
+      // Points at the task it bounced back to, with the actual comment —
+      // that's what the recipient needs to go fix.
+      await notifyRole(instancePatch.assignee_role, {
+        kind: 'declined', title: `More info needed on ${invoice.code}`,
+        detail: `${task.name} requested: ${String(fields.com ?? '').slice(0, 120) || 'see comment on the task'}`,
+        icon: 'alert', tone: 'amber',
+        ref_invoice_id: invoice.id, ref_instance_id: instanceId,
+      });
+    } else {
+      await notifyRole(instancePatch.assignee_role, {
+        kind: 'task', title: `${targetTask.name} awaiting action`,
+        detail: `${invoice.vendor} — ${invoice.code}`, icon: 'zap', tone: 'blue',
+        ref_invoice_id: invoice.id, ref_instance_id: instanceId,
+      });
+    }
   }
 
   const { data: updatedInstance, error: reErr } = await supabase.from('workflow_instances').select('*').eq('id', instanceId).single()
@@ -308,10 +314,9 @@ export async function advanceWorkflowTask(instanceId: string, actionKey: string,
  * workflow_instances whose current task's role matches the caller's role;
  * never a separate table. */
 export async function getApprovalsInbox(userRole: string, userId: string): Promise<ApprovalInboxItem[]> {
-  // 'Info Requested' stays in the assignee's inbox too — requestInfo no
-  // longer reassigns the task, it just flags it while AP Clerk fixes the
-  // invoice, so the original approver still needs to see (and can still
-  // act on) it once that's done.
+  // 'Info Requested' surfaces here too — requestInfo reassigns the task
+  // back to whoever handled the previous step, and that's exactly the
+  // "In Progress"-equivalent state they need to see and act on.
   const { data: instances, error } = await createServiceClient()
     .from('workflow_instances').select('*').in('status', ['In Progress', 'Info Requested']).order('started_at')
     .overrideTypes<WorkflowInstanceRow[], { merge: false }>();

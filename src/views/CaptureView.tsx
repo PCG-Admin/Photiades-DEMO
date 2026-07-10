@@ -2,7 +2,7 @@
 
 /* Document Capture — "Store to Documents" workspace */
 import * as React from 'react';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { I } from '@/components/icons';
 import { Badge, PageHeader } from '@/components/ui';
 import { cx } from '@/lib/utils';
@@ -91,118 +91,204 @@ function formFromExtraction(extracted: ExtractedInvoice): CapForm {
 
 interface MaterialRow { item: string; material: string }
 
+type DuplicateReason = 'file' | 'invoice' | 'batch' | null;
+
+// One queued document — everything that used to be single top-level state
+// (form/lineItems/boxes/duplicate flags/etc.) now lives per-document so
+// several invoices can be uploaded, extracted, and reviewed in one batch.
+interface CapDoc {
+  id: string;
+  file: File;
+  previewUrl: string;
+  form: CapForm;
+  rows: MaterialRow[];
+  lineItems: ExtractedInvoice['lineItems'];
+  boxes: ExtractedInvoice['boxes'];
+  confidence: number | null;
+  extracting: boolean;
+  extractError: string | null;
+  documentHash: string | null;
+  checkingDuplicate: boolean;
+  duplicateOf: InvoiceRow | null;
+  duplicateReason: DuplicateReason;
+  duplicateBatchWith: string | null; // sibling file name, when duplicateReason === 'batch'
+  overrideDuplicate: boolean;
+  stored: boolean;
+}
+
+function makeDoc(id: string, file: File): CapDoc {
+  return {
+    id, file, previewUrl: URL.createObjectURL(file),
+    form: { ...INITIAL_FORM }, rows: [], lineItems: [], boxes: [],
+    confidence: null, extracting: false, extractError: null,
+    documentHash: null, checkingDuplicate: false,
+    duplicateOf: null, duplicateReason: null, duplicateBatchWith: null,
+    overrideDuplicate: false, stored: false,
+  };
+}
+
 // =================== DOCUMENT CAPTURE — "Store to Documents" ===================
 export function CaptureView() {
   const tr = useTr();
   const toast = useToast();
   const go = useGo();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [form, setForm] = useState<CapForm>(INITIAL_FORM);
-  const [rows, setRows] = useState<MaterialRow[]>([]);
-  const [lineItems, setLineItems] = useState<ExtractedInvoice['lineItems']>([]);
-  const [boxes, setBoxes] = useState<ExtractedInvoice['boxes']>([]);
+  const nextId = useRef(0);
+  const [docs, setDocs] = useState<CapDoc[]>([]);
+  const [activeId, setActiveId] = useState<string | null>(null);
   const [activeField, setActiveField] = useState<string | null>(null);
-  const [uploaded, setUploaded] = useState(false);
   const [drag, setDrag] = useState(false);
-  const [file, setFile] = useState<File | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [extracting, setExtracting] = useState(false);
-  const [extractError, setExtractError] = useState<string | null>(null);
-  const [confidence, setConfidence] = useState<number | null>(null);
-  const [storing, setStoring] = useState(false);
-  const [duplicateOf, setDuplicateOf] = useState<InvoiceRow | null>(null);
-  const [duplicateReason, setDuplicateReason] = useState<'file' | 'invoice' | null>(null);
-  const [checkingDuplicate, setCheckingDuplicate] = useState(false);
-  const [overrideDuplicate, setOverrideDuplicate] = useState(false);
-  const [documentHash, setDocumentHash] = useState<string | null>(null);
-  const set = (k: keyof CapForm, v: string | number) => setForm(f => ({ ...f, [k]: v }));
-  const dateInvalid = dateTooOld(form.date);
+  const [storingId, setStoringId] = useState<string | null>(null);
+  const [storedSummary, setStoredSummary] = useState<{ code: string; vendor: string }[]>([]);
 
+  // Mirrors `docs` synchronously for cross-document duplicate checks inside
+  // async handlers, where the `docs` closure would otherwise be stale.
+  const docsRef = useRef<CapDoc[]>([]);
+  useEffect(() => { docsRef.current = docs; }, [docs]);
+
+  function updateDoc(id: string, patch: Partial<CapDoc> | ((d: CapDoc) => Partial<CapDoc>)) {
+    setDocs(ds => ds.map(d => d.id === id ? { ...d, ...(typeof patch === 'function' ? patch(d) : patch) } : d));
+  }
+
+  async function runExtraction(id: string, f: File) {
+    updateDoc(id, { extracting: true, extractError: null, confidence: null });
+    const result = await extractDocument(f);
+    if (!result.ok) {
+      updateDoc(id, { extracting: false, extractError: result.error });
+      toast(`Extraction failed for ${f.name}: ${result.error}`);
+      return;
+    }
+    updateDoc(id, {
+      extracting: false,
+      form: formFromExtraction(result.data),
+      lineItems: result.data.lineItems,
+      boxes: result.data.boxes,
+      confidence: result.data.confidence,
+    });
+    toast(`${f.name}: fields extracted — review before storing`);
+
+    // Batch-internal: another queued document already extracted the same
+    // vendor + invoice number (the file-hash check below only catches byte-
+    // identical re-uploads, not a re-scan of the same paper).
+    const batchDupe = docsRef.current.find(d => d.id !== id &&
+      d.form.vendor.trim().toLowerCase() === result.data.vendor.trim().toLowerCase() &&
+      d.form.invoiceNumber.trim().toLowerCase() === result.data.invoiceNo.trim().toLowerCase());
+    if (batchDupe) {
+      updateDoc(id, { duplicateReason: 'batch', duplicateBatchWith: batchDupe.file.name });
+      return;
+    }
+
+    updateDoc(id, { checkingDuplicate: true });
+    const found = await findDuplicateInvoice(result.data.vendor, result.data.invoiceNo);
+    updateDoc(id, { checkingDuplicate: false });
+    if (found) updateDoc(id, { duplicateOf: found, duplicateReason: 'invoice' });
+  }
+
+  async function processDoc(id: string, f: File) {
+    updateDoc(id, { checkingDuplicate: true });
+    const hash = await sha256Hex(await f.arrayBuffer());
+    updateDoc(id, { documentHash: hash });
+
+    // Exact same file already sitting elsewhere in this same upload.
+    const batchDupe = docsRef.current.find(d => d.id !== id && d.documentHash === hash);
+    if (batchDupe) {
+      updateDoc(id, { checkingDuplicate: false, duplicateReason: 'batch', duplicateBatchWith: batchDupe.file.name });
+      return;
+    }
+
+    // Exact-file check against what's already stored — deterministic, and
+    // cheap enough to run before spending a Gemini call on a document we
+    // already have.
+    const hashDupe = await findDuplicateInvoiceByHash(hash);
+    updateDoc(id, { checkingDuplicate: false });
+    if (hashDupe) {
+      updateDoc(id, { duplicateOf: hashDupe, duplicateReason: 'file' });
+      return;
+    }
+    await runExtraction(id, f);
+  }
+
+  async function handleFiles(files: File[]) {
+    const valid: File[] = [];
+    for (const f of files) {
+      const ext = f.name.slice(f.name.lastIndexOf('.')).toLowerCase();
+      const typeOk = ACCEPTED_UPLOAD_TYPES.includes(f.type) || ACCEPTED_UPLOAD_EXTENSIONS.includes(ext);
+      if (!typeOk) { toast(`${f.name}: unsupported file type — upload a PDF, PNG, JPG, WEBP, or HEIC.`); continue; }
+      if (f.size > MAX_UPLOAD_BYTES) { toast(`${f.name} is too large (${(f.size / 1024 / 1024).toFixed(1)} MB) — max 15 MB.`); continue; }
+      valid.push(f);
+    }
+    if (valid.length === 0) return;
+    setStoredSummary([]); // starting a fresh batch — last batch's summary no longer applies
+    const newDocs = valid.map(f => makeDoc(`doc-${nextId.current++}`, f));
+    setDocs(ds => [...ds, ...newDocs]);
+    setActiveId(prev => prev ?? newDocs[0].id);
+    for (const doc of newDocs) processDoc(doc.id, doc.file);
+  }
+
+  function removeDoc(id: string) {
+    setDocs(ds => {
+      const doc = ds.find(d => d.id === id);
+      if (doc) URL.revokeObjectURL(doc.previewUrl);
+      return ds.filter(d => d.id !== id);
+    });
+    setActiveId(prev => {
+      if (prev !== id) return prev;
+      const remaining = docsRef.current.filter(d => d.id !== id);
+      return remaining[0]?.id ?? null;
+    });
+  }
+
+  function advanceAfterStore(justStoredId: string) {
+    const remaining = docsRef.current.filter(d => d.id !== justStoredId && !d.stored);
+    if (remaining.length > 0) {
+      setActiveId(remaining[0].id);
+      return;
+    }
+    // Batch done. Previously this jumped straight into the last invoice's
+    // detail page, which only gave that one document a direct link —
+    // every earlier document in the batch had no way back except hunting
+    // for it in the Invoices list. Clearing the queue instead surfaces the
+    // landing screen's "Just stored" summary, which links to every
+    // invoice from this batch equally.
+    docsRef.current.forEach(d => URL.revokeObjectURL(d.previewUrl));
+    setDocs([]);
+    setActiveId(null);
+  }
+
+  const active = docs.length > 0 ? (docs.find(d => d.id === activeId) ?? docs[0]) : null;
+
+  const set = (k: keyof CapForm, v: string | number) => { if (active) updateDoc(active.id, d => ({ form: { ...d.form, [k]: v } })); };
   function updateLineItem(i: number, patch: Partial<ExtractedInvoice['lineItems'][number]>) {
-    setLineItems(items => items.map((it, j) => j === i ? { ...it, ...patch } : it));
+    if (!active) return;
+    updateDoc(active.id, d => ({ lineItems: d.lineItems.map((it, j) => j === i ? { ...it, ...patch } : it) }));
   }
   function addLineItem() {
-    setLineItems(items => [...items, { description: '', qty: 1, unitPrice: 0, amount: 0, glCode: null }]);
+    if (!active) return;
+    updateDoc(active.id, d => ({ lineItems: [...d.lineItems, { description: '', qty: 1, unitPrice: 0, amount: 0, glCode: null }] }));
   }
   function removeLineItem(i: number) {
-    setLineItems(items => items.filter((_, j) => j !== i));
+    if (!active) return;
+    updateDoc(active.id, d => ({ lineItems: d.lineItems.filter((_, j) => j !== i) }));
+  }
+  function setRows(updater: (rows: MaterialRow[]) => MaterialRow[]) {
+    if (!active) return;
+    updateDoc(active.id, d => ({ rows: updater(d.rows) }));
   }
 
-  function clearFile() {
-    if (previewUrl) URL.revokeObjectURL(previewUrl);
-    setFile(null); setPreviewUrl(null); setConfidence(null); setExtractError(null);
-    setDuplicateOf(null); setDuplicateReason(null); setOverrideDuplicate(false); setDocumentHash(null);
-  }
-
-  async function runExtraction(f: File) {
-    setExtracting(true);
-    setExtractError(null);
-    setConfidence(null);
-
-    const result = await extractDocument(f);
-    setExtracting(false);
-    if (result.ok) {
-      setForm(formFromExtraction(result.data));
-      setLineItems(result.data.lineItems);
-      setBoxes(result.data.boxes);
-      setConfidence(result.data.confidence);
-      toast('Fields extracted — review before storing');
-      // Secondary check: same vendor + invoice number, in case this is a
-      // re-scan of the same invoice (different file bytes, so the hash
-      // check below wouldn't have caught it).
-      setCheckingDuplicate(true);
-      const found = await findDuplicateInvoice(result.data.vendor, result.data.invoiceNo);
-      setCheckingDuplicate(false);
-      if (found) { setDuplicateOf(found); setDuplicateReason('invoice'); setOverrideDuplicate(false); }
-    } else {
-      setExtractError(result.error);
-      toast(`Extraction failed: ${result.error}`);
-    }
-  }
-
-  async function handleFile(f: File) {
-    const ext = f.name.slice(f.name.lastIndexOf('.')).toLowerCase();
-    const typeOk = ACCEPTED_UPLOAD_TYPES.includes(f.type) || ACCEPTED_UPLOAD_EXTENSIONS.includes(ext);
-    if (!typeOk) {
-      toast(`Unsupported file type — upload a PDF, PNG, JPG, WEBP, or HEIC.`);
-      return;
-    }
-    if (f.size > MAX_UPLOAD_BYTES) {
-      toast(`File is too large (${(f.size / 1024 / 1024).toFixed(1)} MB) — max 15 MB.`);
-      return;
-    }
-
-    setForm(INITIAL_FORM); setRows([]); setLineItems([]); setBoxes([]); setActiveField(null);
-    setDuplicateOf(null); setDuplicateReason(null); setOverrideDuplicate(false);
-    setFile(f);
-    setPreviewUrl(URL.createObjectURL(f));
-    setUploaded(true);
-
-    // Exact-file check first — deterministic, and cheap enough to run
-    // before spending a Gemini call on a document we already have.
-    setCheckingDuplicate(true);
-    const hash = await sha256Hex(await f.arrayBuffer());
-    setDocumentHash(hash);
-    const hashDupe = await findDuplicateInvoiceByHash(hash);
-    setCheckingDuplicate(false);
-
-    if (hashDupe) {
-      setDuplicateOf(hashDupe);
-      setDuplicateReason('file');
-      toast(`This exact file is already stored as ${hashDupe.code}`);
-      return;
-    }
-    await runExtraction(f);
-  }
   async function store() {
-    if (dateInvalid) { toast(`Date cannot be more than ${MAX_DATE_AGE_MONTHS} months old`); return; }
+    if (!active) return;
+    const { form, lineItems, documentHash, confidence, duplicateOf, duplicateReason, overrideDuplicate, file } = active;
+    if (dateTooOld(form.date)) { toast(`Date cannot be more than ${MAX_DATE_AGE_MONTHS} months old`); return; }
     if (!form.vendor.trim() || !form.invoiceNumber.trim() || !form.date || !form.companyCode) {
       toast('Vendor, Invoice Number, Date, and Company Code are required'); return;
     }
     if (duplicateOf && !overrideDuplicate) {
       toast(`Looks like a duplicate of ${duplicateOf.code} — confirm below to store anyway`); return;
     }
-    setStoring(true);
+    if (duplicateReason === 'batch' && !overrideDuplicate) {
+      toast(`Looks like a duplicate within this upload — confirm below to store anyway`); return;
+    }
+    setStoringId(active.id);
     try {
       const invoice = await createInvoiceFromExtraction({
         vendor: form.vendor,
@@ -219,32 +305,66 @@ export function CaptureView() {
         documentHash,
       }, file);
       toast(`Stored as ${invoice.code}`);
-      clearFile();
-      setUploaded(false);
-      go('invoices', invoice.code);
+      updateDoc(active.id, { stored: true });
+      URL.revokeObjectURL(active.previewUrl);
+      setStoredSummary(s => [...s, { code: invoice.code, vendor: form.vendor }]);
+      advanceAfterStore(active.id);
     } catch (err) {
       toast(`Store failed: ${errorMessage(err)}`);
     } finally {
-      setStoring(false);
+      setStoringId(null);
     }
   }
-  function reset() { setForm(INITIAL_FORM); setRows([]); toast('Form reset'); }
-  function cancel() { clearFile(); setUploaded(false); }
+  function resetActive() {
+    if (!active) return;
+    updateDoc(active.id, { form: { ...INITIAL_FORM }, rows: [] });
+    toast('Form reset');
+  }
+  function cancelActive() {
+    if (!active) return;
+    removeDoc(active.id);
+  }
 
-  // Upload landing — the Store screen only appears once a document is uploaded
-  if (!uploaded) {
+  // Upload landing — the Store screen only appears once at least one
+  // document is uploaded
+  if (!active) {
     return (
       <div className="view-enter">
         <PageHeader title={tr('Document Capture')}
-          sub={tr('Upload a document to capture and index it into the portal.')}
+          sub={tr('Upload one or more documents to capture and index them into the portal.')}
           actions={<button className="btn primary" onClick={() => fileInputRef.current?.click()}><I.upload size={16} />{tr('Upload document')}</button>}
         />
-        <input ref={fileInputRef} type="file" accept={[...ACCEPTED_UPLOAD_TYPES, ...ACCEPTED_UPLOAD_EXTENSIONS].join(',')} style={{ display: 'none' }}
-          onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f); e.target.value = ''; }} />
+        <input ref={fileInputRef} type="file" multiple accept={[...ACCEPTED_UPLOAD_TYPES, ...ACCEPTED_UPLOAD_EXTENSIONS].join(',')} style={{ display: 'none' }}
+          onChange={(e) => { const files = Array.from(e.target.files ?? []); if (files.length) handleFiles(files); e.target.value = ''; }} />
+
+        {/* Every document just stored gets an equally direct link here —
+            previously only the last one in a batch got a hand-off (via
+            auto-navigation), leaving earlier ones with no direct path back. */}
+        {storedSummary.length > 0 && (
+          <div className="card" style={{ marginBottom: 'var(--gap-5)', overflow: 'hidden' }}>
+            <div className="card-head">
+              <div className="card-title">{tr('Just stored')}</div>
+              <Badge tone="green">{storedSummary.length}</Badge>
+            </div>
+            <div>
+              {storedSummary.map((s, i) => (
+                <div key={s.code} className="row" style={{ justifyContent: 'space-between', padding: '10px 20px', borderTop: i > 0 ? '1px solid var(--border)' : 'none' }}>
+                  <div className="row" style={{ gap: 10 }}>
+                    <I.check size={15} style={{ color: 'var(--green)' }} />
+                    <span className="mono" style={{ fontWeight: 600, color: 'var(--accent-strong)', fontSize: 13 }}>{s.code}</span>
+                    <span style={{ fontSize: 13 }}>{s.vendor}</span>
+                  </div>
+                  <button className="btn ghost sm" onClick={() => go('invoices', s.code)}>{tr('Open')}<I.arrowR size={14} /></button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         <div
           onDragOver={(e) => { e.preventDefault(); setDrag(true); }}
           onDragLeave={() => setDrag(false)}
-          onDrop={(e) => { e.preventDefault(); setDrag(false); const f = e.dataTransfer.files?.[0]; if (f) handleFile(f); }}
+          onDrop={(e) => { e.preventDefault(); setDrag(false); const files = Array.from(e.dataTransfer.files ?? []); if (files.length) handleFiles(files); }}
           onClick={() => fileInputRef.current?.click()}
           className="card"
           style={{
@@ -257,8 +377,8 @@ export function CaptureView() {
           <div style={{ width: 72, height: 72, borderRadius: 18, background: 'var(--accent-soft)', color: 'var(--accent)', display: 'grid', placeItems: 'center' }}>
             <I.upload size={32} />
           </div>
-          <div style={{ fontWeight: 600, fontSize: 17 }}>{tr('Drop a document to capture')}</div>
-          <div className="muted" style={{ fontSize: 13.5, maxWidth: 380, lineHeight: 1.5 }}>{tr('or click to browse · PDF, PNG, JPG, WEBP. Fields are auto-extracted and the Store form opens for review.')}</div>
+          <div style={{ fontWeight: 600, fontSize: 17 }}>{tr('Drop one or more documents to capture')}</div>
+          <div className="muted" style={{ fontSize: 13.5, maxWidth: 380, lineHeight: 1.5 }}>{tr('or click to browse · PDF, PNG, JPG, WEBP. Select several files at once to queue them — fields are auto-extracted and each opens for review in turn.')}</div>
           <div className="row" style={{ gap: 10, marginTop: 6 }}>
             <button className="btn primary lg" onClick={(e) => { e.stopPropagation(); fileInputRef.current?.click(); }}><I.upload size={16} />{tr('Upload document')}</button>
           </div>
@@ -267,15 +387,45 @@ export function CaptureView() {
     );
   }
 
+  const { form, lineItems, boxes, rows, confidence, extracting, extractError, checkingDuplicate, duplicateOf, duplicateReason, duplicateBatchWith, overrideDuplicate, previewUrl, file } = active;
+  const dateInvalid = dateTooOld(form.date);
+  const blockedByDuplicate = duplicateReason !== null && !overrideDuplicate;
+  const remainingAfterThis = docs.filter(d => !d.stored && d.id !== active.id).length;
+
   return (
     <div className="cap-wrap view-enter">
+      <input ref={fileInputRef} type="file" multiple accept={[...ACCEPTED_UPLOAD_TYPES, ...ACCEPTED_UPLOAD_EXTENSIONS].join(',')} style={{ display: 'none' }}
+        onChange={(e) => { const files = Array.from(e.target.files ?? []); if (files.length) handleFiles(files); e.target.value = ''; }} />
+
+      {/* Queue strip — only shown once there's more than one document to switch between */}
+      {docs.length > 1 && (
+        <div className="row" style={{ gap: 6, marginBottom: 10, flexWrap: 'wrap' }}>
+          {docs.map((d, i) => (
+            <button key={d.id} onClick={() => setActiveId(d.id)}
+              className={cx('btn', 'sm', d.id === active.id ? 'primary' : 'ghost')}
+              style={{ gap: 6 }} title={d.file.name}>
+              {d.stored
+                ? <I.check size={13} />
+                : d.duplicateReason
+                  ? <I.alert size={13} />
+                  : (d.extracting || d.checkingDuplicate) ? <I.refresh size={13} style={{ animation: 'spin 0.9s linear infinite' }} /> : null}
+              {i + 1}. {d.file.name.length > 18 ? `${d.file.name.slice(0, 16)}…` : d.file.name}
+            </button>
+          ))}
+          <button className="btn ghost sm" onClick={() => fileInputRef.current?.click()}><I.plus size={13} />{tr('Add more')}</button>
+        </div>
+      )}
+
       {/* Toolbar */}
       <div className="cap-toolbar">
-        <button className="cap-tbtn" onClick={cancel}><I.chevL size={15} />{tr('Cancel')}</button>
-        <button className="cap-tbtn" onClick={reset}><I.refresh size={14} />{tr('Reset')}</button>
+        <button className="cap-tbtn" onClick={cancelActive}><I.chevL size={15} />{tr('Cancel')}</button>
+        <button className="cap-tbtn" onClick={resetActive}><I.refresh size={14} />{tr('Reset')}</button>
+        {docs.length === 1 && <button className="cap-tbtn" onClick={() => fileInputRef.current?.click()}><I.plus size={14} />{tr('Add more')}</button>}
         <div className="spacer" />
         {confidence != null && <Badge tone={confidence >= 80 ? 'green' : confidence >= 60 ? 'amber' : 'red'}>{confidence}% {tr('extracted')}</Badge>}
-        <button className="cap-store" onClick={store} disabled={extracting || storing || (!!duplicateOf && !overrideDuplicate)}>{storing ? tr('Storing…') : tr('Store')}</button>
+        <button className="cap-store" onClick={store} disabled={extracting || storingId === active.id || blockedByDuplicate}>
+          {storingId === active.id ? tr('Storing…') : remainingAfterThis > 0 ? tr('Store & Next') : tr('Store')}
+        </button>
         <button className="cap-tbtn icon"><I.dots size={16} /></button>
       </div>
 
@@ -307,9 +457,23 @@ export function CaptureView() {
             <button className="btn ghost sm" onClick={() => go('invoices', duplicateOf.code)}>{tr('View existing')}<I.arrowR size={14} /></button>
             {!overrideDuplicate && (
               <button className="btn sm" onClick={() => {
-                setOverrideDuplicate(true);
-                if (duplicateReason === 'file' && file) runExtraction(file);
+                updateDoc(active.id, { overrideDuplicate: true });
+                if (duplicateReason === 'file') runExtraction(active.id, file);
               }}>{duplicateReason === 'file' ? tr('Extract anyway') : tr('Store anyway')}</button>
+            )}
+          </div>
+        </div>
+      )}
+      {duplicateReason === 'batch' && !checkingDuplicate && (
+        <div className="card" style={{ padding: '10px 16px', marginBottom: 12, background: 'var(--amber-soft)', border: '1px solid var(--amber)' }}>
+          <div className="row" style={{ gap: 10, color: 'var(--amber)', flexWrap: 'wrap' }}>
+            <I.alert size={15} />
+            <span style={{ fontSize: 13, color: 'var(--text)' }}>
+              {tr('This looks like the same invoice as')} <strong>{duplicateBatchWith}</strong> {tr('already queued in this same upload.')}
+            </span>
+            <div className="spacer" />
+            {!overrideDuplicate && (
+              <button className="btn sm" onClick={() => updateDoc(active.id, { overrideDuplicate: true })}>{tr('Store anyway')}</button>
             )}
           </div>
         </div>
@@ -412,7 +576,7 @@ export function CaptureView() {
                 <div>{tr('Material')}</div>
               </div>
               <div className="cap-mat-body">
-                <button className="cap-mat-add" onClick={() => setRows(r => [...r, { item: '', material: '' }])} title={tr('Add row')}><I.plus size={14} /></button>
+                <button className="cap-mat-add" onClick={() => setRows(rs => [...rs, { item: '', material: '' }])} title={tr('Add row')}><I.plus size={14} /></button>
                 {rows.map((r, i) => (
                   <div key={i} className="cap-mat-row">
                     <input className="cap-mat-input" value={r.item} placeholder={tr('Item')} onChange={e => setRows(rs => rs.map((x, j) => j === i ? { ...x, item: e.target.value } : x))} />

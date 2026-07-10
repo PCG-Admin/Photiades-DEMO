@@ -70,70 +70,92 @@ export function WorkflowsView({ initialInstances, initialOpen = null }: { initia
         <MiniStat label={tr('Total value in flight')} value={fmtMoney(active.reduce((s, i) => s + i.amount, 0))} tone="green" />
       </div>
 
-      {/* Workflow definition strip */}
-      <div className="card" style={{ marginBottom: 'var(--gap-5)', padding: '16px 20px' }}>
-        <div className="row" style={{ justifyContent: 'space-between', marginBottom: 14 }}>
-          <div className="card-title">{tr(wf.name)}</div>
-          <Badge tone="blue" dot>{tasks.filter(t => !t.auto).length} {tr('tasks')}</Badge>
-        </div>
-        <div className="row" style={{ gap: 0, flexWrap: 'wrap', rowGap: 8 }}>
-          {tasks.map((t, i) => (
-            <React.Fragment key={t.id}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 14px', borderRadius: 8, background: t.auto ? 'var(--violet-soft)' : 'var(--surface-2)', border: '1px solid var(--border)' }}>
-                <div style={{ width: 24, height: 24, borderRadius: 99, background: t.auto ? 'var(--violet)' : 'var(--accent)', color: 'white', display: 'grid', placeItems: 'center', fontSize: 12, fontWeight: 700 }}>{i + 1}</div>
-                <div>
-                  <div style={{ fontSize: 12.5, fontWeight: 600 }}>{tr(t.name)}</div>
-                  <div className="faint" style={{ fontSize: 10.5 }}>{tr(t.role)}</div>
-                </div>
-              </div>
-              {i < tasks.length - 1 && <I.arrowR size={16} style={{ color: 'var(--faint)', margin: '0 6px' }} />}
-            </React.Fragment>
-          ))}
-        </div>
-        {branch && (
-          <div className="row" style={{ gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
-            <span className="faint" style={{ fontSize: 11.5 }}>{tr('Amount check branch:')}</span>
-            <Badge tone="teal">&gt; €{branch.threshold} → {tr(branch.over)}</Badge>
-            <Badge tone="gray">≤ €{branch.threshold} → {tr(branch.under)} ({tr('skips')} {tr(tasks[branch.skipIdx].name)})</Badge>
-          </div>
-        )}
-      </div>
-
-      <div className="card" style={{ overflow: 'hidden' }}>
-        <div className="card-head"><div className="card-title">{tr('In-flight workflows')}</div><Badge tone="gray">{wfInstances.length}</Badge></div>
-        <table className="tbl">
-          <thead>
-            <tr><th>{tr('Workflow')}</th><th>{tr('Vendor')}</th><th className="right">{tr('Amount')}</th><th>{tr('Current task')}</th><th>{tr('Status')}</th><th>{tr('Started')}</th><th style={{ width: 40 }}></th></tr>
-          </thead>
-          <tbody>
-            {wfInstances.map(({ instance: inst, invoiceCode, vendor, po, amount }) => (
-              <tr key={inst.id} className="clickable" onClick={() => setOpen(inst.code)}>
-                <td>
-                  <div className="mono" style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--accent-strong)' }}>{inst.code}</div>
-                  <div className="faint mono" style={{ fontSize: 11 }}>{invoiceCode} · {po || tr('No PO')}</div>
-                </td>
-                <td style={{ fontWeight: 500, fontSize: 13 }}>{vendor}</td>
-                <td className="right num" style={{ fontWeight: 600 }}>{fmtMoney(amount)}</td>
-                <td>
-                  <div className="row" style={{ gap: 8 }}>
-                    <div style={{ width: 22, height: 22, borderRadius: 99, background: 'var(--accent-soft)', color: 'var(--accent-strong)', display: 'grid', placeItems: 'center', fontSize: 11, fontWeight: 700, flexShrink: 0 }}>{inst.task_idx + 1}</div>
-                    <div>
-                      <div style={{ fontSize: 12.5, fontWeight: 500 }}>{tasks[inst.task_idx] && tr(tasks[inst.task_idx].name)}</div>
-                      <div className="faint" style={{ fontSize: 10.5 }}>{tasks[inst.task_idx] && tr(tasks[inst.task_idx].role)}</div>
+      {/* Pipeline board — one column per task, so a pile-up at any step is
+          visible at a glance instead of requiring a scan down a table's
+          "Current task" column. Each column header doubles as the workflow
+          definition strip (task name/role in chain order). */}
+      <div className="board-scroll" style={{ marginBottom: 'var(--gap-5)' }}>
+        <div className="board">
+          {tasks.map((t, i) => {
+            const items = wfInstances.filter(w => w.instance.task_idx === i && (w.instance.status === 'In Progress' || w.instance.status === 'Info Requested'));
+            const busy = items.length > 3;
+            const colTone = t.auto ? 'var(--violet)' : busy ? 'var(--amber)' : 'var(--accent)';
+            return (
+              <React.Fragment key={t.id}>
+                <div className={t.auto ? 'wf-col auto' : 'wf-col'} style={{ ['--col-tone' as string]: colTone }}>
+                  <div className="wf-col-head">
+                    <div className="wf-col-step">
+                      <div className="wf-col-num">{t.auto ? <I.zap size={11} /> : i + 1}</div>
+                      <div>
+                        <div className="wf-col-name">{tr(t.name)}</div>
+                        <div className="wf-col-role">{t.auto ? tr('System · auto') : tr(t.role)}</div>
+                      </div>
                     </div>
+                    {!t.auto && <div className="wf-col-count">{items.length}</div>}
                   </div>
-                </td>
-                <td><Badge tone={statusTone[inst.status]} dot>{tr(inst.status)}</Badge></td>
-                <td className="faint" style={{ fontSize: 12 }}><RelativeTime date={new Date(inst.started_at)} /></td>
-                <td><I.chevR size={16} style={{ color: 'var(--faint)' }} /></td>
-              </tr>
-            ))}
-            {wfInstances.length === 0 && (
-              <tr><td colSpan={7} className="faint" style={{ padding: 20, textAlign: 'center', fontSize: 13 }}>{tr('No instances yet')}</td></tr>
-            )}
-          </tbody>
-        </table>
+                  <div className="wf-stack">
+                    {items.map(({ instance: inst, invoiceCode, vendor, po, amount }) => (
+                      <div key={inst.id} className="wf-card" style={{ ['--card-tone' as string]: inst.status === 'Info Requested' ? 'var(--amber)' : 'var(--border-strong)' }}
+                        onClick={() => setOpen(inst.code)}>
+                        <div className="top">
+                          <span className="mono" style={{ fontSize: 11, fontWeight: 700, color: 'var(--accent-strong)' }}>{inst.code}</span>
+                          {inst.status === 'Info Requested' && <Badge tone="amber" dot>{tr('Info req.')}</Badge>}
+                        </div>
+                        <div className="vendor">{vendor}</div>
+                        <div className="amt">{fmtMoney(amount)}</div>
+                        <div className="meta">
+                          <span className="mono">{po || invoiceCode}</span>
+                          <RelativeTime date={new Date(inst.started_at)} />
+                        </div>
+                      </div>
+                    ))}
+                    {items.length === 0 && <div className="wf-col-empty">{tr('Empty')}</div>}
+                  </div>
+                </div>
+                {i < tasks.length - 1 && <div className="wf-col-arrow"><I.arrowR size={16} /></div>}
+              </React.Fragment>
+            );
+          })}
+        </div>
       </div>
+      {branch && (
+        <div className="row" style={{ gap: 8, marginBottom: 'var(--gap-5)', flexWrap: 'wrap' }}>
+          <span className="faint" style={{ fontSize: 11.5 }}>{tr('Amount check branch:')}</span>
+          <Badge tone="teal">&gt; €{branch.threshold} → {tr(branch.over)}</Badge>
+          <Badge tone="gray">≤ €{branch.threshold} → {tr(branch.under)} ({tr('skips')} {tr(tasks[branch.skipIdx].name)})</Badge>
+        </div>
+      )}
+
+      {/* Terminal instances (declined / completed / etc.) don't sit at a
+          task anymore, so they don't belong on the board — kept as a
+          compact list underneath instead of being lost. */}
+      {(() => {
+        const resolved = wfInstances.filter(w => !['In Progress', 'Info Requested'].includes(w.instance.status));
+        if (resolved.length === 0) return null;
+        return (
+          <div className="card" style={{ overflow: 'hidden' }}>
+            <div className="card-head"><div className="card-title">{tr('Recently resolved')}</div><Badge tone="gray">{resolved.length}</Badge></div>
+            <table className="tbl">
+              <thead><tr><th>{tr('Workflow')}</th><th>{tr('Vendor')}</th><th className="right">{tr('Amount')}</th><th>{tr('Status')}</th><th>{tr('Started')}</th><th style={{ width: 40 }}></th></tr></thead>
+              <tbody>
+                {resolved.map(({ instance: inst, invoiceCode, vendor, po, amount }) => (
+                  <tr key={inst.id} className="clickable" onClick={() => setOpen(inst.code)}>
+                    <td>
+                      <div className="mono" style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--accent-strong)' }}>{inst.code}</div>
+                      <div className="faint mono" style={{ fontSize: 11 }}>{invoiceCode} · {po || tr('No PO')}</div>
+                    </td>
+                    <td style={{ fontWeight: 500, fontSize: 13 }}>{vendor}</td>
+                    <td className="right num" style={{ fontWeight: 600 }}>{fmtMoney(amount)}</td>
+                    <td><Badge tone={statusTone[inst.status]} dot>{tr(inst.status)}</Badge></td>
+                    <td className="faint" style={{ fontSize: 12 }}><RelativeTime date={new Date(inst.started_at)} /></td>
+                    <td><I.chevR size={16} style={{ color: 'var(--faint)' }} /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        );
+      })()}
     </div>
   );
 }
@@ -197,6 +219,12 @@ function WorkflowRunner({ code, onBack, toast, go, onUpdate }: {
     ? { approver: String(fieldsOf(lastHistory.fields).approver ?? 'Unknown'), fromTask: detail.task_idx }
     : null;
 
+  // Surfaces exactly what the later task asked for — right where the
+  // recipient decides, not buried in the history disclosure below.
+  const lastInfoRequest = detail.status === 'Info Requested'
+    ? [...detail.history].reverse().find(h => h.action_key === 'requestInfo')
+    : undefined;
+
   function selectAction(a: WFAction) {
     setSelAction(a.key);
     const initial: Record<string, string | number> = {};
@@ -254,63 +282,74 @@ function WorkflowRunner({ code, onBack, toast, go, onUpdate }: {
         ))}
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '320px 1fr', gap: 'var(--gap-5)', alignItems: 'start' }}>
-        {/* Task timeline */}
-        <div className="card" style={{ position: 'sticky', top: 0 }}>
-          <div className="card-head"><div className="card-title">{tr('Workflow tasks')}</div></div>
-          <div className="card-pad">
-            <WFTimeline tasks={tasks} taskIdx={detail.task_idx} terminal={terminal} isComplete={isComplete} isPendingPmt={isPendingPmt} additionalPending={additionalPending} amount={detail.amount} branch={branch} />
+      {/* Horizontal stepper — reads left-to-right like the pipeline board's
+          columns, so the same chain "reads" the same way on both screens.
+          Replaces the old 320px vertical sidebar, freeing the full width
+          below for the one thing this screen is for: the current decision. */}
+      <HStepper tasks={tasks} taskIdx={detail.task_idx} terminal={terminal} isComplete={isComplete} isPendingPmt={isPendingPmt} additionalPending={additionalPending} amount={detail.amount} branch={branch} />
+
+      {lastInfoRequest && (
+        <div className="card" style={{ padding: '14px 18px', marginBottom: 'var(--gap-5)', background: 'var(--amber-soft)', border: '1px solid var(--amber)' }}>
+          <div className="row" style={{ gap: 10, color: 'var(--text)' }}>
+            <I.alert size={18} style={{ flexShrink: 0, color: 'var(--amber)' }} />
+            <span style={{ fontWeight: 600, fontSize: 13.5 }}>
+              {tr('More information requested')} — {tr(lastInfoRequest.task_name)} ({lastInfoRequest.actor_name})
+            </span>
+            <span className="faint" style={{ fontSize: 11.5, marginLeft: 'auto' }}><RelativeTime date={new Date(lastInfoRequest.occurred_at)} /></span>
           </div>
-        </div>
-
-        {/* Active task panel */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--gap-5)' }}>
-          {terminal ? (
-            <TerminalCard status={detail.status} />
-          ) : isComplete ? (
-            <CompletedCard amount={detail.amount} />
-          ) : isPendingPmt ? (
-            <PendingPaymentCard />
-          ) : additionalPending ? (
-            <AdditionalCard approver={additionalPending.approver} invoice={invoice} submitting={submitting}
-              onResolve={(grant) => submitAction(grant ? 'additionalGrant' : 'additionalDecline', {})} />
-          ) : task.auto ? (
-            <AmountCheckCard amount={detail.amount} branch={branch} submitting={submitting} onConfirm={() => submitAction('routeAmountCheck', {})} />
-          ) : (
-            <ActiveTaskCard task={task} taskIdx={detail.task_idx} selAction={selAction} onSelect={selectAction}
-              form={form} setField={setField} invoice={invoice} approvers={approvers} submitting={submitting}
-              onSubmit={() => submitAction(selAction!)} onCancel={() => setSelAction(null)} />
-          )}
-
-          {/* History */}
-          <div className="card">
-            <div className="card-head"><div className="card-title">{tr('Workflow history')}</div><Badge tone="gray">{detail.history.length}</Badge></div>
-            <div style={{ padding: '8px 0' }}>
-              {detail.history.length === 0 && <div className="faint" style={{ fontSize: 12.5, padding: '10px 20px' }}>{tr('No actions yet')}</div>}
-              {detail.history.map((h, i) => {
-                const action = tasks.find(t => t.id === h.task_id)?.actions?.find(a => a.key === h.action_key);
-                const tone = action?.tone ?? (h.action_key.includes('Grant') ? 'green' : h.action_key.includes('Decline') ? 'red' : 'gray');
-                return (
-                  <div key={h.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '10px 20px', borderBottom: i < detail.history.length - 1 ? '1px solid var(--border)' : 'none' }}>
-                    <div style={{ width: 8, height: 8, borderRadius: 99, background: ACTION_TONE_VAR(tone), marginTop: 5, flexShrink: 0 }} />
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 13 }}><span style={{ fontWeight: 600 }}>{tr(h.actor_name)}</span> <span className="muted">· {tr(h.task_name)}</span></div>
-                      <div style={{ fontSize: 12.5, color: ACTION_TONE_VAR(tone), fontWeight: 600, marginTop: 1 }}>{tr(h.action_label)}</div>
-                      {typeof fieldsOf(h.fields).com === 'string' && Boolean(fieldsOf(h.fields).com) && <div className="muted" style={{ fontSize: 12, marginTop: 3, fontStyle: 'italic' }}>&ldquo;{String(fieldsOf(h.fields).com)}&rdquo;</div>}
-                    </div>
-                    <span className="faint" style={{ fontSize: 11, whiteSpace: 'nowrap' }}><RelativeTime date={new Date(h.occurred_at)} /></span>
-                  </div>
-                );
-              })}
+          {typeof fieldsOf(lastInfoRequest.fields).com === 'string' && (
+            <div style={{ marginTop: 8, fontSize: 13, lineHeight: 1.5, color: 'var(--text-2)' }}>
+              &ldquo;{String(fieldsOf(lastInfoRequest.fields).com)}&rdquo;
             </div>
-          </div>
+          )}
         </div>
-      </div>
+      )}
+
+      {terminal ? (
+        <TerminalCard status={detail.status} />
+      ) : isComplete ? (
+        <CompletedCard amount={detail.amount} />
+      ) : isPendingPmt ? (
+        <PendingPaymentCard />
+      ) : additionalPending ? (
+        <AdditionalCard approver={additionalPending.approver} invoice={invoice} submitting={submitting}
+          onResolve={(grant) => submitAction(grant ? 'additionalGrant' : 'additionalDecline', {})} />
+      ) : task.auto ? (
+        <AmountCheckCard amount={detail.amount} branch={branch} submitting={submitting} onConfirm={() => submitAction('routeAmountCheck', {})} />
+      ) : (
+        <ActiveTaskCard task={task} taskIdx={detail.task_idx} selAction={selAction} onSelect={selectAction}
+          form={form} setField={setField} invoice={invoice} approvers={approvers} submitting={submitting}
+          onSubmit={() => submitAction(selAction!)} onCancel={() => setSelAction(null)} />
+      )}
+
+      {/* History — tucked behind a disclosure instead of always occupying
+          space next to the action card, since it's reference, not the task. */}
+      <details className="disclosure" style={{ marginTop: 'var(--gap-5)' }}>
+        <summary>{tr('Workflow history')} · {detail.history.length} <I.chevR size={14} className="chev" /></summary>
+        <div>
+          {detail.history.length === 0 && <div className="faint" style={{ fontSize: 12.5, padding: '10px 20px' }}>{tr('No actions yet')}</div>}
+          {detail.history.map((h) => {
+            const action = tasks.find(t => t.id === h.task_id)?.actions?.find(a => a.key === h.action_key);
+            const tone = action?.tone ?? (h.action_key.includes('Grant') ? 'green' : h.action_key.includes('Decline') ? 'red' : 'gray');
+            return (
+              <div key={h.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '10px 20px', borderTop: '1px solid var(--border)' }}>
+                <div style={{ width: 8, height: 8, borderRadius: 99, background: ACTION_TONE_VAR(tone), marginTop: 5, flexShrink: 0 }} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 13 }}><span style={{ fontWeight: 600 }}>{tr(h.actor_name)}</span> <span className="muted">· {tr(h.task_name)}</span></div>
+                  <div style={{ fontSize: 12.5, color: ACTION_TONE_VAR(tone), fontWeight: 600, marginTop: 1 }}>{tr(h.action_label)}</div>
+                  {typeof fieldsOf(h.fields).com === 'string' && Boolean(fieldsOf(h.fields).com) && <div className="muted" style={{ fontSize: 12, marginTop: 3, fontStyle: 'italic' }}>&ldquo;{String(fieldsOf(h.fields).com)}&rdquo;</div>}
+                </div>
+                <span className="faint" style={{ fontSize: 11, whiteSpace: 'nowrap' }}><RelativeTime date={new Date(h.occurred_at)} /></span>
+              </div>
+            );
+          })}
+        </div>
+      </details>
     </div>
   );
 }
 
-function WFTimeline({ tasks, taskIdx, terminal, isComplete, isPendingPmt, additionalPending, amount, branch }: {
+function HStepper({ tasks, taskIdx, terminal, isComplete, isPendingPmt, additionalPending, amount, branch }: {
   tasks: WFTask[];
   taskIdx: number;
   terminal: boolean;
@@ -325,37 +364,30 @@ function WFTimeline({ tasks, taskIdx, terminal, isComplete, isPendingPmt, additi
   const branchIdx = branch ? tasks.findIndex(t => t.auto) : -1;
   const lowValueRouted = branch != null && amount <= branch.threshold && (taskIdx > branchIdx || finished || terminal);
   return (
-    <div>
+    <div className="hstepper">
       {tasks.map((t, i) => {
         const skipped = branch && i === branch.skipIdx && lowValueRouted;
         const done = !skipped && (i < taskIdx || (finished && i <= taskIdx));
         const active = i === taskIdx && !terminal && !finished;
         const isTerminalHere = terminal && i === taskIdx;
         const last = i === tasks.length - 1;
+        const stepClass = ['hstep', done && 'done', active && 'active', isTerminalHere && 'terminal', skipped && 'skipped'].filter(Boolean).join(' ');
         return (
-          <div key={t.id} style={{ display: 'flex', gap: 13, opacity: skipped ? 0.5 : 1 }}>
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-              <div style={{
-                width: 30, height: 30, borderRadius: 99, display: 'grid', placeItems: 'center', flexShrink: 0, zIndex: 1,
-                background: isTerminalHere ? 'var(--red)' : skipped ? 'var(--surface-3)' : done ? 'var(--green)' : active ? 'var(--accent)' : 'var(--surface-3)',
-                color: (done || active || isTerminalHere) ? 'white' : 'var(--faint)',
-                boxShadow: active ? '0 0 0 4px var(--accent-ring)' : 'none',
-              }}>
-                {isTerminalHere ? <I.x size={15} stroke={3} /> : skipped ? <span style={{ fontSize: 13, fontWeight: 600 }}>–</span> : done ? <I.check size={15} stroke={3} /> : <span style={{ fontSize: 13, fontWeight: active ? 700 : 600 }}>{i + 1}</span>}
+          <React.Fragment key={t.id}>
+            <div className={stepClass}>
+              <div className="dot">
+                {isTerminalHere ? <I.x size={14} stroke={3} /> : skipped ? '–' : done ? <I.check size={14} stroke={3} /> : i + 1}
               </div>
-              {!last && <div style={{ width: 2, flex: 1, minHeight: 40, background: done ? 'var(--green)' : 'var(--border)' }} />}
+              <div className="name">{tr(t.name)}</div>
+              <div className="role">{tr(t.role)}</div>
+              {skipped && <div style={{ marginTop: 5 }}><Badge tone="gray">{tr('Skipped')}</Badge></div>}
+              {!skipped && active && additionalPending && <div style={{ marginTop: 5 }}><Badge tone="violet" dot>{tr('Awaiting')}</Badge></div>}
+              {!skipped && active && !additionalPending && <div style={{ marginTop: 5 }}><Badge tone="blue" dot>{tr('Current')}</Badge></div>}
+              {last && isComplete && <div style={{ marginTop: 5 }}><Badge tone="green" dot>{tr('Complete')}</Badge></div>}
+              {last && isPendingPmt && <div style={{ marginTop: 5 }}><Badge tone="teal" dot>{tr('Pending payment')}</Badge></div>}
             </div>
-            <div style={{ paddingBottom: last ? 0 : 22, flex: 1 }}>
-              <div style={{ fontSize: 13.5, fontWeight: 600 }}>{tr(t.name)}</div>
-              <div className="faint" style={{ fontSize: 11.5, marginBottom: 6 }}>{tr(t.role)}</div>
-              {skipped && <Badge tone="gray">{tr('Skipped')} · ≤ €{branch!.threshold}</Badge>}
-              {!skipped && active && additionalPending && <Badge tone="violet" dot>{tr('Awaiting additional approval')}</Badge>}
-              {!skipped && active && !additionalPending && <Badge tone="blue" dot>{tr('Current')}</Badge>}
-              {!skipped && done && <Badge tone="green">{tr('Done')}</Badge>}
-              {last && isComplete && <div style={{ marginTop: 6 }}><Badge tone="green" dot>{tr('Workflow complete')}</Badge></div>}
-              {last && isPendingPmt && <div style={{ marginTop: 6 }}><Badge tone="teal" dot>{tr('Pending payment')}</Badge></div>}
-            </div>
-          </div>
+            {!last && <div className={`hline${done ? ' done' : ''}`} />}
+          </React.Fragment>
         );
       })}
     </div>

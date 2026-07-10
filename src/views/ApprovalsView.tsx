@@ -99,7 +99,7 @@ export function ApprovalsView({ initialItems }: { initialItems: ApprovalInboxIte
               </div>
               {sel.instance.status === 'Info Requested' ? (
                 <div className="card" style={{ padding: 14, background: 'var(--amber-soft)', border: '1px solid var(--amber)', fontSize: 13, lineHeight: 1.6, color: 'var(--text)' }}>
-                  {tr('More information was requested — AP Clerk has been notified to update the invoice. This task stays assigned to you and can be actioned again once the invoice is updated.')}
+                  {tr('This was sent back to you because a later step needs more information — check the invoice for what was asked, fix it, then submit your decision again.')}
                 </div>
               ) : (
                 <div className="card" style={{ padding: 14, background: 'var(--surface-2)', fontSize: 13, lineHeight: 1.6, color: 'var(--text-2)' }}>

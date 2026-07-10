@@ -55,8 +55,7 @@ export function WorkflowsView({ initialInstances, initialOpen = null }: { initia
 
   return (
     <div className="view-enter">
-      <PageHeader title={tr('Workflows')} sub={tr('Invoice approval workflows — track and action in-flight items.')}
-        actions={<button className="btn"><I.settings size={15} />{tr('Workflow designer')}</button>} />
+      <PageHeader title={tr('Workflows')} sub={tr('Invoice approval workflows — track and action in-flight items.')} />
 
       {/* Workflow switcher */}
       <div style={{ marginBottom: 'var(--gap-5)' }}>

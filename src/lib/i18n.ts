@@ -81,7 +81,6 @@ export const TRANSLATIONS: Record<Exclude<Lang, 'en'>, Record<string, string>> =
     'Recent': 'Πρόσφατα',
     'Amount': 'Ποσό',
     'Open': 'Άνοιγμα',
-    'Workflow designer': 'Σχεδιαστής ροής',
     'Add user': 'Προσθήκη χρήστη',
     'Advanced filter': 'Σύνθετο φίλτρο',
     'Export log': 'Εξαγωγή αρχείου',

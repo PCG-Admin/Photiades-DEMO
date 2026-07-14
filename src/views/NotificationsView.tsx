@@ -2,9 +2,9 @@
 
 /* Notifications — SOW §4 in-scope module: "Email / in-app task alerts". */
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { I } from '@/components/icons';
-import { Badge, PageHeader, MiniStat, Segmented } from '@/components/ui';
+import { Badge, PageHeader, MiniStat, Segmented, Pagination, usePagination } from '@/components/ui';
 import { RelativeTime } from '@/components/RelativeTime';
 import { useToast } from '@/components/providers/ToastProvider';
 import { useGo } from '@/lib/navigation';
@@ -27,6 +27,8 @@ export function NotificationsView({ initialNotifications }: { initialNotificatio
 
   const unreadCount = items.filter(n => !n.read).length;
   const filtered = filter === 'Unread' ? items.filter(n => !n.read) : items;
+  const { page, setPage, totalPages, pageItems, total, pageSize } = usePagination(filtered);
+  useEffect(() => { setPage(1); }, [filter, setPage]);
 
   // Clicking a notification used to only mark it read — it never took you
   // anywhere, even though task/declined notifications carry a
@@ -69,7 +71,7 @@ export function NotificationsView({ initialNotifications }: { initialNotificatio
         </div>
         <div>
           {filtered.length === 0 && <div className="empty"><I.check size={32} /><div style={{ marginTop: 10 }}>{tr("You're all caught up!")}</div></div>}
-          {filtered.map(n => {
+          {pageItems.map(n => {
             const Ico = (n.icon && I[n.icon]) || I.bell;
             const tone = n.tone ?? 'gray';
             return (
@@ -98,6 +100,7 @@ export function NotificationsView({ initialNotifications }: { initialNotificatio
             );
           })}
         </div>
+        <Pagination page={page} totalPages={totalPages} onChange={setPage} total={total} pageSize={pageSize} />
       </div>
     </div>
   );

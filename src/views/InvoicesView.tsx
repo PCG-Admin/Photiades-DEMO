@@ -5,7 +5,7 @@
 import * as React from 'react';
 import { useState, useEffect, useMemo } from 'react';
 import { I } from '@/components/icons';
-import { Badge, StatusBadge, Checkbox, Segmented, PageHeader, MiniStat, Modal } from '@/components/ui';
+import { Badge, StatusBadge, Checkbox, Segmented, PageHeader, MiniStat, Modal, Pagination, usePagination } from '@/components/ui';
 import { FF, ReadField } from '@/components/form-fields';
 import { ApprovalChain } from '@/components/ApprovalChain';
 import { DocumentHighlightPreview } from '@/components/DocumentHighlightPreview';
@@ -64,13 +64,16 @@ export function InvoicesView({ initialInvoices, initialId = null }: { initialInv
   if (q) filtered = filtered.filter(i => (i.vendor + i.code + (i.po || '')).toLowerCase().includes(q.toLowerCase()));
   filtered = [...filtered].sort((a, b) => sortBy === 'amount' ? b.total - a.total : new Date(b.received_at).getTime() - new Date(a.received_at).getTime());
 
+  const { page, setPage, totalPages, pageItems, total, pageSize } = usePagination(filtered);
+  useEffect(() => { setPage(1); }, [tab, q, sortBy, setPage]);
+
   if (selectedCode) {
     return <InvoiceDetail code={selectedCode} onBack={() => setSelectedCode(null)} onSave={saveInvoice} onDelete={removeInvoice} />;
   }
 
   const toggleAll = () => {
-    if (checked.size === filtered.length) setChecked(new Set());
-    else setChecked(new Set(filtered.map(i => i.id)));
+    if (pageItems.every(i => checked.has(i.id))) setChecked(new Set());
+    else setChecked(new Set(pageItems.map(i => i.id)));
   };
 
   return (
@@ -119,13 +122,13 @@ export function InvoicesView({ initialInvoices, initialId = null }: { initialInv
           <table className="tbl">
             <thead>
               <tr>
-                <th style={{ width: 40 }}><Checkbox checked={checked.size === filtered.length && filtered.length > 0} onChange={toggleAll} /></th>
+                <th style={{ width: 40 }}><Checkbox checked={pageItems.length > 0 && pageItems.every(i => checked.has(i.id))} onChange={toggleAll} /></th>
                 <th>{tr('Invoice')}</th><th>{tr('Vendor')}</th><th>{tr('PO match')}</th><th className="right">{tr('Amount')}</th>
                 <th style={{ width: 130 }}>{tr('Confidence')}</th><th>{tr('Status')}</th><th>{tr('Due')}</th>
               </tr>
             </thead>
             <tbody>
-              {filtered.map(inv => (
+              {pageItems.map(inv => (
                 <tr key={inv.id} className={cx('clickable', checked.has(inv.id) && 'selected')} onClick={() => setSelectedCode(inv.code)}>
                   <td onClick={e => e.stopPropagation()}>
                     <Checkbox checked={checked.has(inv.id)} onChange={(v) => {
@@ -168,6 +171,7 @@ export function InvoicesView({ initialInvoices, initialId = null }: { initialInv
           </table>
           {filtered.length === 0 && <div className="empty"><I.invoice size={32} /><div style={{ marginTop: 10 }}>{invoices.length === 0 ? tr('No invoices captured yet') : tr('No invoices match your filters')}</div></div>}
         </div>
+        <Pagination page={page} totalPages={totalPages} onChange={setPage} total={total} pageSize={pageSize} />
       </div>
     </div>
   );

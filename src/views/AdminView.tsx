@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { I } from '@/components/icons';
-import { StatusBadge, Avatar, Badge, Segmented, Modal, PageHeader, MiniStat } from '@/components/ui';
+import { StatusBadge, Avatar, Badge, Segmented, Modal, PageHeader, MiniStat, Pagination, usePagination } from '@/components/ui';
 import { cx } from '@/lib/utils';
 import { RelativeTime } from '@/components/RelativeTime';
 import { ROLES, DEPTS } from '@/lib/constants';
@@ -55,6 +55,9 @@ export function AdminView({ initialUsers, initialMappings, initialPermissions }:
     { role: 'Auditor', perms: 'Read-only · audit & reports', tone: 'amber' },
     { role: 'Viewer', perms: 'Read-only · dashboards', tone: 'gray' },
   ];
+
+  const usersPagination = usePagination(users);
+  const mappingsPagination = usePagination(mappings);
 
   function hasAccess(role: AppUserRow['role'], module: PortalModule): boolean {
     return permissions.find(p => p.role === role && p.module === module)?.can_access ?? false;
@@ -151,7 +154,7 @@ export function AdminView({ initialUsers, initialMappings, initialPermissions }:
               <tr><th>{tr('User')}</th><th>{tr('Role')}</th><th>{tr('Department')}</th><th>{tr('Status')}</th><th>{tr('MFA')}</th><th>{tr('Last active')}</th></tr>
             </thead>
             <tbody>
-              {users.map(u => (
+              {usersPagination.pageItems.map(u => (
                 <tr key={u.id} className="clickable" onClick={() => setEdit(u)}>
                   <td>
                     <div className="row" style={{ gap: 11 }}>
@@ -172,6 +175,7 @@ export function AdminView({ initialUsers, initialMappings, initialPermissions }:
               {users.length === 0 && <tr><td colSpan={6} className="faint" style={{ padding: 20, textAlign: 'center' }}>{tr('No users yet')}</td></tr>}
             </tbody>
           </table>
+          <Pagination page={usersPagination.page} totalPages={usersPagination.totalPages} onChange={usersPagination.setPage} total={usersPagination.total} pageSize={usersPagination.pageSize} />
         </div>
       ) : tab === 'Roles & Permissions' ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--gap-5)' }}>
@@ -223,7 +227,7 @@ export function AdminView({ initialUsers, initialMappings, initialPermissions }:
               <tr><th>{tr('Task')}</th><th>{tr('Amount range')}</th><th>{tr('Routes to')}</th><th /></tr>
             </thead>
             <tbody>
-              {mappings.map(m => {
+              {mappingsPagination.pageItems.map(m => {
                 const task = ASSIGNABLE_TASKS.find(t => t.id === m.task_id);
                 const approverUser = users.find(u => u.id === m.approver_user_id);
                 return (
@@ -248,6 +252,7 @@ export function AdminView({ initialUsers, initialMappings, initialPermissions }:
               {mappings.length === 0 && <tr><td colSpan={4} className="faint" style={{ padding: 20, textAlign: 'center' }}>{tr('No approver mappings configured — tasks fall back to their default role.')}</td></tr>}
             </tbody>
           </table>
+          <Pagination page={mappingsPagination.page} totalPages={mappingsPagination.totalPages} onChange={mappingsPagination.setPage} total={mappingsPagination.total} pageSize={mappingsPagination.pageSize} />
         </div>
       )}
 

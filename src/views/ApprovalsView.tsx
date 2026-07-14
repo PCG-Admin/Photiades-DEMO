@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { I } from '@/components/icons';
-import { Badge, PageHeader, MiniStat } from '@/components/ui';
+import { Badge, PageHeader, MiniStat, Pagination, usePagination } from '@/components/ui';
 import { fmtMoney } from '@/lib/utils';
 import { RelativeTime } from '@/components/RelativeTime';
 import { useGo } from '@/lib/navigation';
@@ -25,6 +25,7 @@ export function ApprovalsView({ initialItems }: { initialItems: ApprovalInboxIte
   const [selCode, setSelCode] = useState<string | null>(initialItems[0]?.instance.code ?? null);
 
   const sel = items.find(i => i.instance.code === selCode) ?? null;
+  const { page, setPage, totalPages, pageItems, total, pageSize } = usePagination(items);
 
   return (
     <div className="view-enter">
@@ -46,7 +47,7 @@ export function ApprovalsView({ initialItems }: { initialItems: ApprovalInboxIte
           </div>
           <div style={{ flex: 1, overflowY: 'auto' }}>
             {items.length === 0 && <div className="empty"><I.check size={32} /><div style={{ marginTop: 10 }}>{tr('All caught up!')}</div></div>}
-            {items.map(item => {
+            {pageItems.map(item => {
               const priority = priorityOf(item.amount);
               const prioTone: Record<string, string> = { High: 'red', Medium: 'amber', Low: 'gray' };
               const on = sel?.instance.code === item.instance.code;
@@ -73,6 +74,7 @@ export function ApprovalsView({ initialItems }: { initialItems: ApprovalInboxIte
               );
             })}
           </div>
+          <Pagination page={page} totalPages={totalPages} onChange={setPage} total={total} pageSize={pageSize} />
         </div>
 
         {/* Detail */}

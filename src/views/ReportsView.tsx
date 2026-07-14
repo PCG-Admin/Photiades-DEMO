@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { I, type IconComponent } from '@/components/icons';
-import { Badge, MiniStat, PageHeader } from '@/components/ui';
+import { Badge, MiniStat, PageHeader, Pagination, usePagination } from '@/components/ui';
 import { fmtMoney, cx } from '@/lib/utils';
 import { fmtDate } from '@/lib/format';
 import { downloadCsv } from '@/lib/csv';
@@ -239,6 +239,7 @@ function DeclinedInvoicesReport() {
   const [data, setData] = useState<DeclinedRow[] | null>(null);
   useEffect(() => { getDeclinedTrend().then(setData); }, []);
   const totalValue = data?.reduce((s, r) => s + r.amount, 0) ?? 0;
+  const { page, setPage, totalPages, pageItems, total: totalRows, pageSize } = usePagination(data ?? []);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--gap-5)' }}>
@@ -252,21 +253,24 @@ function DeclinedInvoicesReport() {
         exportData={data?.map(r => ({ invoice: r.code, vendor: r.vendor, amount: r.amount, task: r.taskName, reason: r.reason, when: r.when }))} exportFilename="declined-invoices">
         {data && (
           data.length === 0 ? <div className="faint" style={{ fontSize: 13 }}>{tr('No declined invoices yet.')}</div> : (
-            <table className="tbl">
-              <thead><tr><th>{tr('Invoice')}</th><th>{tr('Vendor')}</th><th className="right">{tr('Amount')}</th><th>{tr('Task')}</th><th>{tr('Reason')}</th><th>{tr('When')}</th></tr></thead>
-              <tbody>
-                {data.map((r, i) => (
-                  <tr key={i}>
-                    <td className="mono">{r.code}</td>
-                    <td>{r.vendor}</td>
-                    <td className="right num">{fmtMoney(r.amount)}</td>
-                    <td><Badge tone="red">{r.taskName}</Badge></td>
-                    <td className="faint" style={{ fontStyle: r.reason ? 'italic' : 'normal' }}>{r.reason || '—'}</td>
-                    <td className="faint">{fmtDate(new Date(r.when))}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <>
+              <table className="tbl">
+                <thead><tr><th>{tr('Invoice')}</th><th>{tr('Vendor')}</th><th className="right">{tr('Amount')}</th><th>{tr('Task')}</th><th>{tr('Reason')}</th><th>{tr('When')}</th></tr></thead>
+                <tbody>
+                  {pageItems.map((r, i) => (
+                    <tr key={i}>
+                      <td className="mono">{r.code}</td>
+                      <td>{r.vendor}</td>
+                      <td className="right num">{fmtMoney(r.amount)}</td>
+                      <td><Badge tone="red">{r.taskName}</Badge></td>
+                      <td className="faint" style={{ fontStyle: r.reason ? 'italic' : 'normal' }}>{r.reason || '—'}</td>
+                      <td className="faint">{fmtDate(new Date(r.when))}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <Pagination page={page} totalPages={totalPages} onChange={setPage} total={totalRows} pageSize={pageSize} />
+            </>
           )
         )}
       </ReportCard>
@@ -280,6 +284,7 @@ function PendingPaymentsReport() {
   const [data, setData] = useState<InvoiceRow[] | null>(null);
   useEffect(() => { getPendingPayments().then(setData); }, []);
   const total = data?.reduce((s, r) => s + r.total, 0) ?? 0;
+  const { page, setPage, totalPages, pageItems, total: totalRows, pageSize } = usePagination(data ?? []);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--gap-5)' }}>
@@ -293,19 +298,22 @@ function PendingPaymentsReport() {
         exportData={data?.map(r => ({ invoice: r.code, vendor: r.vendor, amount: r.total, due: r.due_at }))} exportFilename="pending-payments">
         {data && (
           data.length === 0 ? <div className="faint" style={{ fontSize: 13 }}>{tr('No invoices pending payment.')}</div> : (
-            <table className="tbl">
-              <thead><tr><th>{tr('Invoice')}</th><th>{tr('Vendor')}</th><th className="right">{tr('Amount')}</th><th>{tr('Due')}</th></tr></thead>
-              <tbody>
-                {data.map(r => (
-                  <tr key={r.id}>
-                    <td className="mono">{r.code}</td>
-                    <td>{r.vendor}</td>
-                    <td className="right num" style={{ fontWeight: 600 }}>{fmtMoney(r.total)}</td>
-                    <td className="faint">{fmtDate(new Date(r.due_at))}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <>
+              <table className="tbl">
+                <thead><tr><th>{tr('Invoice')}</th><th>{tr('Vendor')}</th><th className="right">{tr('Amount')}</th><th>{tr('Due')}</th></tr></thead>
+                <tbody>
+                  {pageItems.map(r => (
+                    <tr key={r.id}>
+                      <td className="mono">{r.code}</td>
+                      <td>{r.vendor}</td>
+                      <td className="right num" style={{ fontWeight: 600 }}>{fmtMoney(r.total)}</td>
+                      <td className="faint">{fmtDate(new Date(r.due_at))}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <Pagination page={page} totalPages={totalPages} onChange={setPage} total={totalRows} pageSize={pageSize} />
+            </>
           )
         )}
       </ReportCard>

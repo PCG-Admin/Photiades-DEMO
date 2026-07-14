@@ -264,6 +264,37 @@ export function PageHeader({ title, sub, actions }: { title: React.ReactNode; su
   );
 }
 
+// Client-side pagination — every list in this app fetches its full result
+// set server-side already (no query is large enough yet to need range()/
+// offset() at the DB level), so slicing an already-fetched array is enough.
+const PAGE_SIZE = 10;
+export function usePagination<T>(items: T[], pageSize = PAGE_SIZE) {
+  const [page, setPage] = useState(1);
+  const totalPages = Math.max(1, Math.ceil(items.length / pageSize));
+  const clampedPage = Math.min(page, totalPages);
+  const start = (clampedPage - 1) * pageSize;
+  return { page: clampedPage, setPage, totalPages, pageItems: items.slice(start, start + pageSize), total: items.length, pageSize };
+}
+
+export function Pagination({ page, totalPages, onChange, total, pageSize }: {
+  page: number; totalPages: number; onChange: (p: number) => void; total: number; pageSize: number;
+}) {
+  const tr = useTr();
+  if (totalPages <= 1) return null;
+  const from = total === 0 ? 0 : (page - 1) * pageSize + 1;
+  const to = Math.min(page * pageSize, total);
+  return (
+    <div className="row" style={{ justifyContent: 'space-between', padding: '12px 20px', borderTop: '1px solid var(--border)' }}>
+      <span className="faint" style={{ fontSize: 12 }}>{from}–{to} {tr('of')} {total}</span>
+      <div className="row" style={{ gap: 6 }}>
+        <button className="btn ghost sm" onClick={() => onChange(page - 1)} disabled={page <= 1}><I.chevL size={14} /></button>
+        <span style={{ fontSize: 12.5, padding: '0 8px', fontFamily: 'var(--mono)' }}>{page} / {totalPages}</span>
+        <button className="btn ghost sm" onClick={() => onChange(page + 1)} disabled={page >= totalPages}><I.chevR size={14} /></button>
+      </div>
+    </div>
+  );
+}
+
 export function Toast({ msg, icon }: { msg: string; icon?: IconComponent }) {
   const Ico = icon || I.check;
   return (

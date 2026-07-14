@@ -1,8 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { I } from '@/components/icons';
-import { Avatar, Badge, PageHeader } from '@/components/ui';
+import { Avatar, Badge, PageHeader, Pagination, usePagination } from '@/components/ui';
 import { cx } from '@/lib/utils';
 import { fmtTime } from '@/lib/format';
 import { downloadCsv } from '@/lib/csv';
@@ -24,9 +24,13 @@ export function AuditView({ initialEvents }: { initialEvents: AuditEventRow[] })
   if (moduleFilter !== 'All') rows = rows.filter(r => r.module === moduleFilter);
   if (q) rows = rows.filter(r => (r.actor_name + r.action + (r.target || '') + r.code).toLowerCase().includes(q.toLowerCase()));
 
-  // group by day
+  const { page, setPage, totalPages, pageItems, total, pageSize } = usePagination(rows);
+  useEffect(() => { setPage(1); }, [moduleFilter, q, setPage]);
+
+  // group by day — only the current page's rows, so the day headers reflect
+  // what's actually shown rather than the full unpaginated result set.
   const groups: Record<string, AuditEventRow[]> = {};
-  rows.forEach(r => {
+  pageItems.forEach(r => {
     const key = new Date(r.occurred_at).toLocaleDateString('en-GB', { weekday: 'long', day: '2-digit', month: 'long' });
     (groups[key] = groups[key] || []).push(r);
   });
@@ -73,6 +77,7 @@ export function AuditView({ initialEvents }: { initialEvents: AuditEventRow[] })
             </div>
           ))}
         </div>
+        <Pagination page={page} totalPages={totalPages} onChange={setPage} total={total} pageSize={pageSize} />
       </div>
     </div>
   );

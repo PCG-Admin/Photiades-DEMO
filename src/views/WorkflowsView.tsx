@@ -3,7 +3,7 @@
 import * as React from 'react';
 import { useEffect, useState } from 'react';
 import { I } from '@/components/icons';
-import { Badge, Avatar, Segmented, PageHeader, MiniStat } from '@/components/ui';
+import { Badge, Avatar, Segmented, PageHeader, MiniStat, Pagination, usePagination } from '@/components/ui';
 import { fmtMoney } from '@/lib/utils';
 import { RelativeTime } from '@/components/RelativeTime';
 import { useToast } from '@/components/providers/ToastProvider';
@@ -40,17 +40,21 @@ export function WorkflowsView({ initialInstances, initialOpen = null }: { initia
     setInstances(prev => prev.map(x => x.instance.code === updatedCode ? { ...x, instance: { ...x.instance, ...patch } } : x));
   }
 
-  if (open) {
-    return <WorkflowRunner code={open} onBack={() => setOpen(null)} toast={toast}
-      onUpdate={(patch) => refreshOne(open, patch)} />;
-  }
-
   const wf = wfById(wfId);
   const tasks = wf.tasks;
   const statusTone: Record<string, string> = { 'In Progress': 'blue', 'Info Requested': 'amber', 'Declined': 'red', 'Completed': 'green', 'Pending Payment': 'teal', 'Order not placed via PD': 'gray' };
   const wfInstances = instances.filter(i => i.instance.wf_id === wfId);
   const active = wfInstances.filter(i => i.instance.status === 'In Progress' || i.instance.status === 'Info Requested');
   const branch = tasks.find(t => t.auto)?.branch;
+  const resolved = wfInstances.filter(w => !['In Progress', 'Info Requested'].includes(w.instance.status));
+  const resolvedPagination = usePagination(resolved);
+  const { setPage: setResolvedPage } = resolvedPagination;
+  useEffect(() => { setResolvedPage(1); }, [wfId, setResolvedPage]);
+
+  if (open) {
+    return <WorkflowRunner code={open} onBack={() => setOpen(null)} toast={toast}
+      onUpdate={(patch) => refreshOne(open, patch)} />;
+  }
 
   return (
     <div className="view-enter">
@@ -127,33 +131,30 @@ export function WorkflowsView({ initialInstances, initialOpen = null }: { initia
       {/* Terminal instances (declined / completed / etc.) don't sit at a
           task anymore, so they don't belong on the board — kept as a
           compact list underneath instead of being lost. */}
-      {(() => {
-        const resolved = wfInstances.filter(w => !['In Progress', 'Info Requested'].includes(w.instance.status));
-        if (resolved.length === 0) return null;
-        return (
-          <div className="card" style={{ overflow: 'hidden' }}>
-            <div className="card-head"><div className="card-title">{tr('Recently resolved')}</div><Badge tone="gray">{resolved.length}</Badge></div>
-            <table className="tbl">
-              <thead><tr><th>{tr('Workflow')}</th><th>{tr('Vendor')}</th><th className="right">{tr('Amount')}</th><th>{tr('Status')}</th><th>{tr('Started')}</th><th style={{ width: 40 }}></th></tr></thead>
-              <tbody>
-                {resolved.map(({ instance: inst, invoiceCode, vendor, po, amount }) => (
-                  <tr key={inst.id} className="clickable" onClick={() => setOpen(inst.code)}>
-                    <td>
-                      <div className="mono" style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--accent-strong)' }}>{inst.code}</div>
-                      <div className="faint mono" style={{ fontSize: 11 }}>{invoiceCode} · {po || tr('No PO')}</div>
-                    </td>
-                    <td style={{ fontWeight: 500, fontSize: 13 }}>{vendor}</td>
-                    <td className="right num" style={{ fontWeight: 600 }}>{fmtMoney(amount)}</td>
-                    <td><Badge tone={statusTone[inst.status]} dot>{tr(inst.status)}</Badge></td>
-                    <td className="faint" style={{ fontSize: 12 }}><RelativeTime date={new Date(inst.started_at)} /></td>
-                    <td><I.chevR size={16} style={{ color: 'var(--faint)' }} /></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        );
-      })()}
+      {resolved.length > 0 && (
+        <div className="card" style={{ overflow: 'hidden' }}>
+          <div className="card-head"><div className="card-title">{tr('Recently resolved')}</div><Badge tone="gray">{resolved.length}</Badge></div>
+          <table className="tbl">
+            <thead><tr><th>{tr('Workflow')}</th><th>{tr('Vendor')}</th><th className="right">{tr('Amount')}</th><th>{tr('Status')}</th><th>{tr('Started')}</th><th style={{ width: 40 }}></th></tr></thead>
+            <tbody>
+              {resolvedPagination.pageItems.map(({ instance: inst, invoiceCode, vendor, po, amount }) => (
+                <tr key={inst.id} className="clickable" onClick={() => setOpen(inst.code)}>
+                  <td>
+                    <div className="mono" style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--accent-strong)' }}>{inst.code}</div>
+                    <div className="faint mono" style={{ fontSize: 11 }}>{invoiceCode} · {po || tr('No PO')}</div>
+                  </td>
+                  <td style={{ fontWeight: 500, fontSize: 13 }}>{vendor}</td>
+                  <td className="right num" style={{ fontWeight: 600 }}>{fmtMoney(amount)}</td>
+                  <td><Badge tone={statusTone[inst.status]} dot>{tr(inst.status)}</Badge></td>
+                  <td className="faint" style={{ fontSize: 12 }}><RelativeTime date={new Date(inst.started_at)} /></td>
+                  <td><I.chevR size={16} style={{ color: 'var(--faint)' }} /></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <Pagination page={resolvedPagination.page} totalPages={resolvedPagination.totalPages} onChange={resolvedPagination.setPage} total={resolvedPagination.total} pageSize={resolvedPagination.pageSize} />
+        </div>
+      )}
     </div>
   );
 }

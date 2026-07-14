@@ -15,6 +15,7 @@ export const TRANSLATIONS: Record<Exclude<Lang, 'en'>, Record<string, string>> =
     'Yes': 'Ναι',
     'No': 'Όχι',
     'NA': 'Δ/Ε',
+    'of': 'από',
     'Stock & Non Stock': 'Απόθεμα & Μη-απόθεμα',
 
     // Brand / chrome

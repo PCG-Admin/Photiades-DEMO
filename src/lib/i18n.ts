@@ -535,6 +535,13 @@ export const TRANSLATIONS: Record<Exclude<Lang, 'en'>, Record<string, string>> =
       'Τελική έγκριση Διευθυντή Λογιστηρίου για την απελευθέρωση του τιμολογίου.',
     'Accounts Department final approval — confirm document numbers before releasing for payment.':
       'Τελική έγκριση Λογιστηρίου — επιβεβαίωση αριθμών εγγράφων πριν την απελευθέρωση για πληρωμή.',
+    'Special Invoice Workflow': 'Ροή Ειδικού Τιμολογίου',
+    'Accounts Department reviews the special invoice and routes it for approval.':
+      'Το Λογιστήριο ελέγχει το ειδικό τιμολόγιο και το δρομολογεί για έγκριση.',
+    'The requisitioner reviews and approves the special invoice.':
+      'Ο αιτών ελέγχει και εγκρίνει το ειδικό τιμολόγιο.',
+    'Accounts Manager approval for the special invoice.':
+      'Έγκριση Διευθυντή Λογιστηρίου για το ειδικό τιμολόγιο.',
     'Verify the imported non-stock invoice and confirm where it should be routed for approval.':
       'Επιβεβαιώστε το εισαγόμενο τιμολόγιο μη-αποθέματος και πού πρέπει να δρομολογηθεί για έγκριση.',
     'The requisitioner reviews and approves the non-stock invoice.':

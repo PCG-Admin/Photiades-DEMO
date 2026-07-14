@@ -102,7 +102,7 @@ export interface DocumentRow {
 export interface WorkflowInstanceRow {
   id: string;
   code: string;
-  wf_id: 'stock' | 'nonstock';
+  wf_id: 'stock' | 'nonstock' | 'special';
   invoice_id: string;
   task_idx: number;
   status: 'In Progress' | 'Info Requested' | 'Declined' | 'Completed' | 'Pending Payment' | 'Order not placed via PD';

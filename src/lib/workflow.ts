@@ -352,10 +352,106 @@ export const WF_NONSTOCK_TASKS: WFTask[] = [
   },
 ];
 
+// ---- Special Invoice Workflow definition ----
+// Special Invoice's own fields (Document Number, Material Code) are
+// collected at Capture time itself, so unlike Stock/Non-Stock this chain
+// has no separate AP Clerk "imported" task — it starts directly with
+// Accounts Department review.
+export const WF_SPECIAL_TASKS: WFTask[] = [
+  {
+    id: 'sp1', name: 'AcDep-Approval', role: 'Accounts Department', stage: 'Approval',
+    desc: 'Accounts Department reviews the special invoice and routes it for approval.',
+    actions: [
+      { key: 'approved', label: 'Approved', tone: 'green', icon: 'check',
+        fields: [
+          { k: 'invNo', label: 'Invoice Number', type: 'ro', src: 'invNo' },
+          { k: 'po', label: 'PO Number', type: 'ro', src: 'po' },
+          { k: 'amount', label: 'Amount', type: 'ro-currency', src: 'amount' },
+          { k: 'com', label: 'Comment', type: 'textarea' },
+        ] },
+      { key: 'requestInfo', label: 'Request Info', tone: 'amber', icon: 'refresh',
+        fields: [{ k: 'com', label: 'Comment', type: 'textarea', required: true }] },
+      { key: 'declined', label: 'Declined', tone: 'red', icon: 'x',
+        fields: [{ k: 'com', label: 'Comment', type: 'textarea', required: true }] },
+    ],
+  },
+  {
+    id: 'sp2', name: 'Req/ner-Approval', role: 'Requisitioner', stage: 'Approval',
+    desc: 'The requisitioner reviews and approves the special invoice.',
+    actions: [
+      { key: 'approved', label: 'Approved', tone: 'green', icon: 'check',
+        fields: [
+          { k: 'invNo', label: 'Invoice Number', type: 'ro', src: 'invNo' },
+          { k: 'po', label: 'PO Number', type: 'ro', src: 'po' },
+          { k: 'amount', label: 'Amount', type: 'ro-currency', src: 'amount' },
+          { k: 'com', label: 'Comment', type: 'textarea' },
+        ] },
+      { key: 'requestInfo', label: 'Request Info', tone: 'amber', icon: 'refresh',
+        fields: [{ k: 'com', label: 'Comment', type: 'textarea', required: true }] },
+      { key: 'declined', label: 'Declined', tone: 'red', icon: 'x',
+        fields: [{ k: 'com', label: 'Comment', type: 'textarea', required: true }] },
+    ],
+  },
+  {
+    id: 'sp3', name: 'AcMgr-Approval', role: 'Accounts Manager', stage: 'Approval',
+    desc: 'Accounts Manager approval for the special invoice.',
+    actions: [
+      { key: 'additional', label: 'Additional Approval', tone: 'violet', icon: 'users',
+        fields: [
+          { k: 'invNo', label: 'Invoice Number', type: 'ro', src: 'invNo' },
+          { k: 'po', label: 'PO Number', type: 'ro', src: 'po' },
+          { k: 'amount', label: 'Amount', type: 'ro-currency', src: 'amount' },
+          { k: 'approver', label: 'Select user to approve', type: 'select', options: [], required: true },
+          { k: 'com', label: 'Comment', type: 'textarea' },
+        ] },
+      { key: 'approved', label: 'Approved', tone: 'green', icon: 'check',
+        fields: [
+          { k: 'invNo', label: 'Invoice Number', type: 'ro', src: 'invNo' },
+          { k: 'po', label: 'PO Number', type: 'ro', src: 'po' },
+          { k: 'amount', label: 'Amount', type: 'ro-currency', src: 'amount' },
+          { k: 'com', label: 'Comment', type: 'textarea' },
+        ] },
+      { key: 'requestInfo', label: 'Request Info', tone: 'amber', icon: 'refresh',
+        fields: [{ k: 'com', label: 'Comment', type: 'textarea', required: true }] },
+      { key: 'declined', label: 'Declined', tone: 'red', icon: 'x',
+        fields: [{ k: 'com', label: 'Comment', type: 'textarea', required: true }] },
+    ],
+  },
+  {
+    id: 'sp4', name: 'AcDep-Approval', role: 'Accounts Department', stage: 'Approval',
+    desc: 'Accounts Department final approval — confirm document numbers before releasing for payment.',
+    actions: [
+      { key: 'approved', label: 'Approved', tone: 'green', icon: 'check',
+        fields: [
+          { k: 'invNo', label: 'Invoice Number', type: 'ro', src: 'invNo' },
+          { k: 'po', label: 'PO Number', type: 'ro', src: 'po' },
+          { k: 'amount', label: 'Amount', type: 'ro-currency', src: 'amount' },
+          { k: 'stkDoc', label: 'Stock Document Number', type: 'text' },
+          { k: 'nonStkDoc', label: 'Non-Stock Document Number', type: 'text' },
+          { k: 'com', label: 'Comment', type: 'textarea' },
+        ] },
+      { key: 'requestInfo', label: 'Request Info', tone: 'amber', icon: 'refresh',
+        fields: [{ k: 'com', label: 'Comment', type: 'textarea', required: true }] },
+      { key: 'declined', label: 'Declined', tone: 'red', icon: 'x',
+        fields: [{ k: 'com', label: 'Comment', type: 'textarea', required: true }] },
+      { key: 'pendPmt', label: 'Pend. Pmt', tone: 'teal', icon: 'clock',
+        fields: [
+          { k: 'invNo', label: 'Invoice Number', type: 'ro', src: 'invNo' },
+          { k: 'po', label: 'PO Number', type: 'ro', src: 'po' },
+          { k: 'amount', label: 'Amount', type: 'ro-currency', src: 'amount' },
+          { k: 'stkDoc', label: 'Stock Document Number', type: 'text' },
+          { k: 'nonStkDoc', label: 'Non-Stock Document Number', type: 'text' },
+          { k: 'com', label: 'Comment', type: 'textarea' },
+        ] },
+    ],
+  },
+];
+
 // ---- Workflow registry ----
 export const WORKFLOWS: Workflow[] = [
   { id: 'stock', name: 'Stock Invoice Workflow', short: 'Stock', tasks: WF_STOCK_TASKS },
   { id: 'nonstock', name: 'Non-Stock Invoice Workflow', short: 'Non-Stock', tasks: WF_NONSTOCK_TASKS },
+  { id: 'special', name: 'Special Invoice Workflow', short: 'Special', tasks: WF_SPECIAL_TASKS },
 ];
 export const wfById = (id: string) => WORKFLOWS.find(w => w.id === id) || WORKFLOWS[0];
 

@@ -9,6 +9,7 @@ import { resolveApproverForTask } from '@/lib/server/approverMappings';
 import { getUsersWhoDelegatedToMe } from '@/lib/server/delegations';
 import { recordAuditEvent } from '@/lib/server/audit';
 import { notifyRole } from '@/lib/server/notifications';
+import { getDocumentUrl } from '@/lib/server/storage';
 import type { WorkflowInstanceRow, WorkflowHistoryRow, InvoiceRow, AuditChange } from '@/lib/supabase/types';
 
 export interface WorkflowInstanceWithHistory extends WorkflowInstanceRow {
@@ -115,17 +116,24 @@ export interface WorkflowInstanceDetail extends WorkflowInstanceWithHistory {
   vendor: string;
   po: string | null;
   amount: number;
+  documentUrl: string | null;
+  documentMimeType: string | null;
 }
 
 /** Backs the WorkflowRunner detail screen — instance + history + the
- * linked invoice's display fields. */
+ * linked invoice's display fields, including its source document so the
+ * runner can show the same preview InvoicesView/CaptureView do. */
 export async function getWorkflowInstanceDetail(code: string): Promise<WorkflowInstanceDetail | null> {
   const withHist = await getWorkflowInstance(code);
   if (!withHist) return null;
   const { data: invoice } = await createServiceClient()
     .from('invoices').select('*').eq('id', withHist.invoice_id).single()
     .overrideTypes<InvoiceRow, { merge: false }>();
-  return { ...withHist, invoiceCode: invoice?.code ?? '—', vendor: invoice?.vendor ?? '—', po: invoice?.po ?? null, amount: invoice?.total ?? 0 };
+  const documentUrl = invoice?.document_path ? await getDocumentUrl(invoice.document_path) : null;
+  return {
+    ...withHist, invoiceCode: invoice?.code ?? '—', vendor: invoice?.vendor ?? '—', po: invoice?.po ?? null, amount: invoice?.total ?? 0,
+    documentUrl, documentMimeType: invoice?.document_mime_type ?? null,
+  };
 }
 
 /** Used by InvoicesView's approval-chain panel — an invoice has at most one

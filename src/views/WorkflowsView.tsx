@@ -7,7 +7,6 @@ import { Badge, Avatar, Segmented, PageHeader, MiniStat } from '@/components/ui'
 import { fmtMoney } from '@/lib/utils';
 import { RelativeTime } from '@/components/RelativeTime';
 import { useToast } from '@/components/providers/ToastProvider';
-import { useGo } from '@/lib/navigation';
 import {
   WORKFLOWS, wfById, ACTION_TONE_VAR, ACTION_SOFT_VAR,
   type WFTask, type WFAction, type WFField, type WFBranch,
@@ -18,6 +17,7 @@ import {
 } from '@/lib/server/workflows';
 import { listAppUsers } from '@/lib/server/users';
 import { errorMessage } from '@/lib/errorMessage';
+import { DocumentHighlightPreview } from '@/components/DocumentHighlightPreview';
 import { useTr } from '@/lib/i18n';
 
 type Invoice = { invNo: string; po: string | null; amount: number };
@@ -32,7 +32,6 @@ function fieldsOf(fields: unknown): Record<string, unknown> {
 export function WorkflowsView({ initialInstances, initialOpen = null }: { initialInstances: WorkflowInstanceListItem[]; initialOpen?: string | null }) {
   const tr = useTr();
   const toast = useToast();
-  const go = useGo();
   const [instances, setInstances] = useState<WorkflowInstanceListItem[]>(initialInstances);
   const [open, setOpen] = useState<string | null>(initialOpen);
   const [wfId, setWfId] = useState('stock');
@@ -42,7 +41,7 @@ export function WorkflowsView({ initialInstances, initialOpen = null }: { initia
   }
 
   if (open) {
-    return <WorkflowRunner code={open} onBack={() => setOpen(null)} toast={toast} go={go}
+    return <WorkflowRunner code={open} onBack={() => setOpen(null)} toast={toast}
       onUpdate={(patch) => refreshOne(open, patch)} />;
   }
 
@@ -160,11 +159,10 @@ export function WorkflowsView({ initialInstances, initialOpen = null }: { initia
 }
 
 // =================== WORKFLOW RUNNER ===================
-function WorkflowRunner({ code, onBack, toast, go, onUpdate }: {
+function WorkflowRunner({ code, onBack, toast, onUpdate }: {
   code: string;
   onBack: () => void;
   toast: (msg: string) => void;
-  go: ReturnType<typeof useGo>;
   onUpdate: (patch: Partial<WorkflowInstanceDetail>) => void;
 }) {
   const tr = useTr();
@@ -271,20 +269,15 @@ function WorkflowRunner({ code, onBack, toast, go, onUpdate }: {
           { l: tr('Invoice'), v: detail.invoiceCode, mono: true },
           { l: tr('PO Number'), v: detail.po || tr('No PO'), mono: true },
           { l: tr('Amount'), v: fmtMoney(detail.amount), mono: true, big: true },
-        ].map((f) => (
-          <div key={f.l} style={{ flex: 1, padding: '14px 20px', borderRight: '1px solid var(--border)' }}>
+        ].map((f, i) => (
+          <div key={f.l} style={{ flex: 1, padding: '14px 20px', borderRight: i < 2 ? '1px solid var(--border)' : 'none' }}>
             <div className="muted" style={{ fontSize: 11 }}>{f.l}</div>
             <div className={f.mono ? 'mono' : ''} style={{ fontSize: f.big ? 18 : 14, fontWeight: f.big ? 700 : 600, marginTop: 4 }}>{f.v}</div>
           </div>
         ))}
-        <button onClick={() => go('invoices', detail.invoiceCode)}
-          style={{ flex: 1, padding: '14px 20px', border: 'none', background: 'none', textAlign: 'left', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--accent-strong)' }}>{tr('View invoice')}</span>
-          <I.arrowR size={16} style={{ color: 'var(--accent-strong)' }} />
-        </button>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '320px 1fr', gap: 'var(--gap-5)', alignItems: 'start' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '320px minmax(0, 1fr) minmax(0, 1fr)', gap: 'var(--gap-5)', alignItems: 'start' }}>
         {/* Task timeline — back on the left, like the original layout. */}
         <div className="card" style={{ position: 'sticky', top: 0 }}>
           <div className="card-head"><div className="card-title">{tr('Workflow tasks')}</div></div>
@@ -351,6 +344,22 @@ function WorkflowRunner({ code, onBack, toast, go, onUpdate }: {
               })}
             </div>
           </details>
+        </div>
+
+        {/* Invoice document preview — sticky like the task timeline, so it
+            stays visible while acting on the current task. */}
+        <div className="card" style={{ position: 'sticky', top: 0, overflow: 'hidden' }}>
+          <div className="card-head"><div className="card-title">{tr('Source document')}</div></div>
+          <div style={{ maxHeight: 'calc(100vh - 230px)', overflowY: 'auto', padding: 24, background: 'var(--surface-2)' }}>
+            {detail.documentUrl ? (
+              <DocumentHighlightPreview url={detail.documentUrl} mimeType={detail.documentMimeType} fileName={detail.invoiceCode} />
+            ) : (
+              <div className="empty" style={{ padding: '60px 24px' }}>
+                <I.doc size={32} />
+                <div style={{ marginTop: 10 }}>{tr('No stored document')}</div>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>

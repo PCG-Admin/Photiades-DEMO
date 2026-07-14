@@ -263,8 +263,6 @@ function WorkflowRunner({ code, onBack, toast, go, onUpdate }: {
           </div>
           <div className="muted" style={{ fontSize: 13, marginTop: 3 }}>{tr(wf.name)} · {detail.vendor}</div>
         </div>
-        <div className="spacer" />
-        <button className="btn" onClick={() => go('invoices', detail.invoiceCode)}><I.invoice size={15} />{tr('View invoice')}</button>
       </div>
 
       {/* facts bar */}
@@ -273,12 +271,17 @@ function WorkflowRunner({ code, onBack, toast, go, onUpdate }: {
           { l: tr('Invoice'), v: detail.invoiceCode, mono: true },
           { l: tr('PO Number'), v: detail.po || tr('No PO'), mono: true },
           { l: tr('Amount'), v: fmtMoney(detail.amount), mono: true, big: true },
-        ].map((f, i) => (
-          <div key={f.l} style={{ flex: 1, padding: '14px 20px', borderRight: i < 2 ? '1px solid var(--border)' : 'none' }}>
+        ].map((f) => (
+          <div key={f.l} style={{ flex: 1, padding: '14px 20px', borderRight: '1px solid var(--border)' }}>
             <div className="muted" style={{ fontSize: 11 }}>{f.l}</div>
             <div className={f.mono ? 'mono' : ''} style={{ fontSize: f.big ? 18 : 14, fontWeight: f.big ? 700 : 600, marginTop: 4 }}>{f.v}</div>
           </div>
         ))}
+        <button onClick={() => go('invoices', detail.invoiceCode)}
+          style={{ flex: 1, padding: '14px 20px', border: 'none', background: 'none', textAlign: 'left', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--accent-strong)' }}>{tr('View invoice')}</span>
+          <I.arrowR size={16} style={{ color: 'var(--accent-strong)' }} />
+        </button>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '320px 1fr', gap: 'var(--gap-5)', alignItems: 'start' }}>

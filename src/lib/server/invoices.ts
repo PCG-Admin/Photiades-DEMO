@@ -142,9 +142,13 @@ export interface CaptureStoreInput {
   vendorRef: string;
   stockType: InvoiceRow['stock_type'];
   amount: number;      // total
-  lineItems: { description: string; qty: number; unitPrice: number; amount: number; glCode: string | null }[];
+  lineItems: { description: string; qty: number; unitPrice: number; amount: number; glCode: string | null; item?: string | null; material?: string | null; uom?: string | null }[];
   confidence: number | null;
   documentHash: string | null;
+  sapPostingType: string | null;
+  sapInvText: string | null;
+  invoiceKind: InvoiceRow['invoice_kind'];
+  documentNumber: string | null;
 }
 
 /** Backs Capture's "Store" button: creates the invoice + line items, uploads
@@ -187,6 +191,10 @@ export async function createInvoiceFromExtraction(input: CaptureStoreInput, file
     stock_doc_number: null,
     non_stock_doc_number: null,
     xml_status: 'Pending' as const,
+    sap_posting_type: input.sapPostingType || null,
+    sap_inv_text: input.sapInvText || null,
+    invoice_kind: input.invoiceKind,
+    document_number: input.documentNumber || null,
     grn: null,
     facsimile: null,
     extracted_conf: input.confidence != null ? { overall: input.confidence } : null,
@@ -210,6 +218,9 @@ export async function createInvoiceFromExtraction(input: CaptureStoreInput, file
       unit_price: li.unitPrice,
       amount: li.amount,
       gl_code: li.glCode,
+      item: li.item ?? null,
+      material: li.material ?? null,
+      uom: li.uom ?? null,
     }));
     const { error: liError } = await supabase.from('invoice_line_items').insert(lineItemRows as never);
     if (liError) throw liError;

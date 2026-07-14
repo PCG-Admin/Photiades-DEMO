@@ -218,15 +218,16 @@ export const TRANSLATIONS: Record<Exclude<Lang, 'en'>, Record<string, string>> =
     'Pick a request from the inbox': 'Επιλέξτε ένα αίτημα από τα εισερχόμενα',
 
     // Document Capture
-    'Upload a document to capture and index it into the portal.': 'Μεταφορτώστε ένα έγγραφο για καταχώρηση και ευρετηρίαση στην πύλη.',
     'Upload one or more documents to capture and index them into the portal.': 'Μεταφορτώστε ένα ή περισσότερα έγγραφα για καταχώρηση και ευρετηρίαση στην πύλη.',
-    'Drop a document to capture': 'Αφήστε ένα έγγραφο για καταχώρηση',
-    'Drop one or more documents to capture': 'Αφήστε ένα ή περισσότερα έγγραφα για καταχώρηση',
-    'or click to browse · PDF, PNG, JPG, WEBP. Fields are auto-extracted and the Store form opens for review.':
-      'ή κάντε κλικ για περιήγηση · PDF, PNG, JPG, WEBP. Τα πεδία εξάγονται αυτόματα και ανοίγει η φόρμα αποθήκευσης για έλεγχο.',
-    'or click to browse · PDF, PNG, JPG, WEBP. Select several files at once to queue them — fields are auto-extracted and each opens for review in turn.':
-      'ή κάντε κλικ για περιήγηση · PDF, PNG, JPG, WEBP. Επιλέξτε πολλά αρχεία ταυτόχρονα για να μπουν σε ουρά — τα πεδία εξάγονται αυτόματα και το καθένα ανοίγει για έλεγχο με τη σειρά του.',
     'Just stored': 'Μόλις αποθηκεύτηκαν',
+    'Standard Invoice': 'Τυπικό Τιμολόγιο',
+    'Special Invoice': 'Ειδικό Τιμολόγιο',
+    'The regular invoice flow — Description, Qty, Unit Price, GL Code line items.': 'Η συνήθης ροή τιμολογίου — γραμμές με Περιγραφή, Ποσότητα, Τιμή Μονάδας, Κωδικό GL.',
+    'Adds a Document Number field, and a Material Code table (Item, Material, UOM) instead of line items.': 'Προσθέτει πεδίο Αριθμού Εγγράφου, και πίνακα Κωδικού Υλικού (Είδος, Υλικό, Μονάδα Μέτρησης) αντί για γραμμές τιμολογίου.',
+    'Document Number': 'Αριθμός Εγγράφου',
+    'Total': 'Σύνολο',
+    'UOM': 'Μονάδα Μέτρησης',
+    'No material lines captured — add one manually if needed': 'Δεν καταγράφηκαν γραμμές υλικού — προσθέστε μία χειροκίνητα αν χρειάζεται',
     'Reset': 'Επαναφορά',
     'extracted': 'εξήχθησαν',
     'Storing…': 'Αποθήκευση…',

@@ -53,6 +53,10 @@ export interface InvoiceRow {
   stock_doc_number: string | null;
   non_stock_doc_number: string | null;
   xml_status: 'Pending' | 'Exported' | 'Failed';
+  sap_posting_type: string | null;
+  sap_inv_text: string | null;
+  invoice_kind: 'Standard' | 'Special';
+  document_number: string | null;
   grn: string | null;
   facsimile: Json | null;
   extracted_conf: Json | null;
@@ -72,6 +76,11 @@ export interface InvoiceLineItemRow {
   unit_price: number;
   amount: number;
   gl_code: string | null;
+  // Special Invoice's Material Code table reuses this table instead of a
+  // parallel one — description/amount already fit Description/Total.
+  item: string | null;
+  material: string | null;
+  uom: string | null;
 }
 
 export interface DocumentRow {

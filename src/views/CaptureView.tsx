@@ -46,6 +46,7 @@ interface CapForm {
   po: string; companyCode: string; invoiceNumber: string; vendorRef: string;
   sapPostingType: string; sapInvText: string;
   stockType: string; stockDocNumber: string; nonStockDocNumber: string;
+  documentNumber: string; comment: string;
 }
 
 const INITIAL_FORM: CapForm = {
@@ -62,10 +63,15 @@ const INITIAL_FORM: CapForm = {
   stockType: '',
   stockDocNumber: '',
   nonStockDocNumber: '',
+  documentNumber: '',
+  comment: '',
 };
 
 /** Maps Gemini's extraction result (src/lib/gemini/extract.ts) onto the
- * capture indexing form's fields (SOW §5.1 auto-extract requirement). */
+ * capture indexing form's fields (SOW §5.1 auto-extract requirement). Used
+ * for both Standard and Special Invoice — Special just displays a
+ * different subset of these same fields (see the kind-conditional form
+ * below) plus its own Document Number, which Gemini doesn't extract. */
 function formFromExtraction(extracted: ExtractedInvoice): CapForm {
   return {
     docType: 'Invoice', status: 'Extracted', xmlStatus: 'New',
@@ -86,11 +92,19 @@ function formFromExtraction(extracted: ExtractedInvoice): CapForm {
     stockType: extracted.stockType ?? '',
     stockDocNumber: '',
     nonStockDocNumber: '',
+    documentNumber: '',
+    comment: '',
   };
 }
 
 interface MaterialRow { item: string; material: string }
 
+// Special Invoice's Material Code table — replaces Line Items entirely for
+// that kind (per the DocuWare Special Invoice form: Item/Material/
+// Description/Total/UOM, no Qty/Unit Price/GL Code).
+interface SpecialMaterialRow { item: string; material: string; description: string; total: number; uom: string }
+
+type CapKind = 'standard' | 'special';
 type DuplicateReason = 'file' | 'invoice' | 'batch' | null;
 
 // One queued document — everything that used to be single top-level state
@@ -98,11 +112,13 @@ type DuplicateReason = 'file' | 'invoice' | 'batch' | null;
 // several invoices can be uploaded, extracted, and reviewed in one batch.
 interface CapDoc {
   id: string;
+  kind: CapKind;
   file: File;
   previewUrl: string;
   form: CapForm;
   rows: MaterialRow[];
   lineItems: ExtractedInvoice['lineItems'];
+  materialRows: SpecialMaterialRow[];
   boxes: ExtractedInvoice['boxes'];
   confidence: number | null;
   extracting: boolean;
@@ -116,10 +132,10 @@ interface CapDoc {
   stored: boolean;
 }
 
-function makeDoc(id: string, file: File): CapDoc {
+function makeDoc(id: string, file: File, kind: CapKind): CapDoc {
   return {
-    id, file, previewUrl: URL.createObjectURL(file),
-    form: { ...INITIAL_FORM }, rows: [], lineItems: [], boxes: [],
+    id, kind, file, previewUrl: URL.createObjectURL(file),
+    form: { ...INITIAL_FORM }, rows: [], lineItems: [], materialRows: [], boxes: [],
     confidence: null, extracting: false, extractError: null,
     documentHash: null, checkingDuplicate: false,
     duplicateOf: null, duplicateReason: null, duplicateBatchWith: null,
@@ -134,12 +150,18 @@ export function CaptureView() {
   const go = useGo();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const nextId = useRef(0);
+  const uploadKindRef = useRef<CapKind>('standard');
   const [docs, setDocs] = useState<CapDoc[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [activeField, setActiveField] = useState<string | null>(null);
-  const [drag, setDrag] = useState(false);
+  const [dragKind, setDragKind] = useState<CapKind | null>(null);
   const [storingId, setStoringId] = useState<string | null>(null);
   const [storedSummary, setStoredSummary] = useState<{ code: string; vendor: string }[]>([]);
+
+  function openUpload(kind: CapKind) {
+    uploadKindRef.current = kind;
+    fileInputRef.current?.click();
+  }
 
   // Mirrors `docs` synchronously for cross-document duplicate checks inside
   // async handlers, where the `docs` closure would otherwise be stale.
@@ -158,10 +180,16 @@ export function CaptureView() {
       toast(`Extraction failed for ${f.name}: ${result.error}`);
       return;
     }
+    // Same Gemini extraction for both kinds — Special Invoice just reshapes
+    // the extracted line items into its Material Code table (Item/Material
+    // are left blank since Gemini has no concept of them yet; Description
+    // and Total carry over).
+    const kind = docsRef.current.find(d => d.id === id)?.kind ?? 'standard';
     updateDoc(id, {
       extracting: false,
       form: formFromExtraction(result.data),
-      lineItems: result.data.lineItems,
+      lineItems: kind === 'standard' ? result.data.lineItems : [],
+      materialRows: kind === 'special' ? result.data.lineItems.map(li => ({ item: '', material: '', description: li.description, total: li.amount, uom: '' })) : [],
       boxes: result.data.boxes,
       confidence: result.data.confidence,
     });
@@ -208,7 +236,7 @@ export function CaptureView() {
     await runExtraction(id, f);
   }
 
-  async function handleFiles(files: File[]) {
+  async function handleFiles(files: File[], kind: CapKind) {
     const valid: File[] = [];
     for (const f of files) {
       const ext = f.name.slice(f.name.lastIndexOf('.')).toLowerCase();
@@ -219,7 +247,7 @@ export function CaptureView() {
     }
     if (valid.length === 0) return;
     setStoredSummary([]); // starting a fresh batch — last batch's summary no longer applies
-    const newDocs = valid.map(f => makeDoc(`doc-${nextId.current++}`, f));
+    const newDocs = valid.map(f => makeDoc(`doc-${nextId.current++}`, f, kind));
     setDocs(ds => [...ds, ...newDocs]);
     setActiveId(prev => prev ?? newDocs[0].id);
     for (const doc of newDocs) processDoc(doc.id, doc.file);
@@ -274,10 +302,22 @@ export function CaptureView() {
     if (!active) return;
     updateDoc(active.id, d => ({ rows: updater(d.rows) }));
   }
+  function updateMaterialRow(i: number, patch: Partial<SpecialMaterialRow>) {
+    if (!active) return;
+    updateDoc(active.id, d => ({ materialRows: d.materialRows.map((r, j) => j === i ? { ...r, ...patch } : r) }));
+  }
+  function addMaterialRow() {
+    if (!active) return;
+    updateDoc(active.id, d => ({ materialRows: [...d.materialRows, { item: '', material: '', description: '', total: 0, uom: '' }] }));
+  }
+  function removeMaterialRow(i: number) {
+    if (!active) return;
+    updateDoc(active.id, d => ({ materialRows: d.materialRows.filter((_, j) => j !== i) }));
+  }
 
   async function store() {
     if (!active) return;
-    const { form, lineItems, documentHash, confidence, duplicateOf, duplicateReason, overrideDuplicate, file } = active;
+    const { kind, form, lineItems, materialRows, documentHash, confidence, duplicateOf, duplicateReason, overrideDuplicate, file } = active;
     if (dateTooOld(form.date)) { toast(`Date cannot be more than ${MAX_DATE_AGE_MONTHS} months old`); return; }
     if (!form.vendor.trim() || !form.invoiceNumber.trim() || !form.date || !form.companyCode) {
       toast('Vendor, Invoice Number, Date, and Company Code are required'); return;
@@ -300,9 +340,15 @@ export function CaptureView() {
         vendorRef: form.vendorRef,
         stockType: (form.stockType || null) as 'Stock' | 'Non-stock' | 'Stock & Non Stock' | null,
         amount: Number(form.amount) || 0,
-        lineItems: lineItems.map(li => ({ description: li.description, qty: li.qty, unitPrice: li.unitPrice, amount: li.amount, glCode: li.glCode })),
+        lineItems: kind === 'standard'
+          ? lineItems.map(li => ({ description: li.description, qty: li.qty, unitPrice: li.unitPrice, amount: li.amount, glCode: li.glCode }))
+          : materialRows.map(r => ({ description: r.description, qty: 1, unitPrice: r.total, amount: r.total, glCode: null, item: r.item || null, material: r.material || null, uom: r.uom || null })),
         confidence,
         documentHash,
+        sapPostingType: form.sapPostingType || null,
+        sapInvText: form.sapInvText || null,
+        invoiceKind: kind === 'special' ? 'Special' : 'Standard',
+        documentNumber: kind === 'special' ? (form.documentNumber || null) : null,
       }, file);
       toast(`Stored as ${invoice.code}`);
       updateDoc(active.id, { stored: true });
@@ -317,7 +363,7 @@ export function CaptureView() {
   }
   function resetActive() {
     if (!active) return;
-    updateDoc(active.id, { form: { ...INITIAL_FORM }, rows: [] });
+    updateDoc(active.id, { form: { ...INITIAL_FORM }, rows: [], materialRows: [] });
     toast('Form reset');
   }
   function cancelActive() {
@@ -332,10 +378,9 @@ export function CaptureView() {
       <div className="view-enter">
         <PageHeader title={tr('Document Capture')}
           sub={tr('Upload one or more documents to capture and index them into the portal.')}
-          actions={<button className="btn primary" onClick={() => fileInputRef.current?.click()}><I.upload size={16} />{tr('Upload document')}</button>}
         />
         <input ref={fileInputRef} type="file" multiple accept={[...ACCEPTED_UPLOAD_TYPES, ...ACCEPTED_UPLOAD_EXTENSIONS].join(',')} style={{ display: 'none' }}
-          onChange={(e) => { const files = Array.from(e.target.files ?? []); if (files.length) handleFiles(files); e.target.value = ''; }} />
+          onChange={(e) => { const files = Array.from(e.target.files ?? []); if (files.length) handleFiles(files, uploadKindRef.current); e.target.value = ''; }} />
 
         {/* Every document just stored gets an equally direct link here —
             previously only the last one in a batch got a hand-off (via
@@ -361,33 +406,43 @@ export function CaptureView() {
           </div>
         )}
 
-        <div
-          onDragOver={(e) => { e.preventDefault(); setDrag(true); }}
-          onDragLeave={() => setDrag(false)}
-          onDrop={(e) => { e.preventDefault(); setDrag(false); const files = Array.from(e.dataTransfer.files ?? []); if (files.length) handleFiles(files); }}
-          onClick={() => fileInputRef.current?.click()}
-          className="card"
-          style={{
-            border: drag ? '2px dashed var(--accent)' : '2px dashed var(--border-strong)',
-            background: drag ? 'var(--accent-softer)' : 'var(--surface)',
-            padding: '64px 24px', textAlign: 'center', cursor: 'pointer', transition: 'all 0.15s',
-            display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16,
-            minHeight: 'calc(100vh - 280px)', justifyContent: 'center',
-          }}>
-          <div style={{ width: 72, height: 72, borderRadius: 18, background: 'var(--accent-soft)', color: 'var(--accent)', display: 'grid', placeItems: 'center' }}>
-            <I.upload size={32} />
-          </div>
-          <div style={{ fontWeight: 600, fontSize: 17 }}>{tr('Drop one or more documents to capture')}</div>
-          <div className="muted" style={{ fontSize: 13.5, maxWidth: 380, lineHeight: 1.5 }}>{tr('or click to browse · PDF, PNG, JPG, WEBP. Select several files at once to queue them — fields are auto-extracted and each opens for review in turn.')}</div>
-          <div className="row" style={{ gap: 10, marginTop: 6 }}>
-            <button className="btn primary lg" onClick={(e) => { e.stopPropagation(); fileInputRef.current?.click(); }}><I.upload size={16} />{tr('Upload document')}</button>
-          </div>
+        {/* Two blocks — Standard vs Special Invoice — since they capture a
+            different field set (Special has its own Document Number and a
+            Material Code table instead of Line Items). */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--gap-5)' }}>
+          {([
+            { kind: 'standard' as const, title: tr('Standard Invoice'), desc: tr('The regular invoice flow — Description, Qty, Unit Price, GL Code line items.') },
+            { kind: 'special' as const, title: tr('Special Invoice'), desc: tr('Adds a Document Number field, and a Material Code table (Item, Material, UOM) instead of line items.') },
+          ]).map(({ kind, title, desc }) => (
+            <div key={kind}
+              onDragOver={(e) => { e.preventDefault(); setDragKind(kind); }}
+              onDragLeave={() => setDragKind(k => k === kind ? null : k)}
+              onDrop={(e) => { e.preventDefault(); setDragKind(null); const files = Array.from(e.dataTransfer.files ?? []); if (files.length) handleFiles(files, kind); }}
+              onClick={() => openUpload(kind)}
+              className="card"
+              style={{
+                border: dragKind === kind ? '2px dashed var(--accent)' : '2px dashed var(--border-strong)',
+                background: dragKind === kind ? 'var(--accent-softer)' : 'var(--surface)',
+                padding: '48px 24px', textAlign: 'center', cursor: 'pointer', transition: 'all 0.15s',
+                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14,
+                minHeight: 'calc(100vh - 320px)', justifyContent: 'center',
+              }}>
+              <div style={{ width: 60, height: 60, borderRadius: 16, background: 'var(--accent-soft)', color: 'var(--accent)', display: 'grid', placeItems: 'center' }}>
+                <I.upload size={26} />
+              </div>
+              <div style={{ fontWeight: 600, fontSize: 16 }}>{title}</div>
+              <div className="muted" style={{ fontSize: 13, maxWidth: 320, lineHeight: 1.5 }}>{desc}</div>
+              <div className="row" style={{ gap: 10, marginTop: 4 }}>
+                <button className="btn primary" onClick={(e) => { e.stopPropagation(); openUpload(kind); }}><I.upload size={15} />{tr('Upload document')}</button>
+              </div>
+            </div>
+          ))}
         </div>
       </div>
     );
   }
 
-  const { form, lineItems, boxes, rows, confidence, extracting, extractError, checkingDuplicate, duplicateOf, duplicateReason, duplicateBatchWith, overrideDuplicate, previewUrl, file } = active;
+  const { kind, form, lineItems, materialRows, boxes, rows, confidence, extracting, extractError, checkingDuplicate, duplicateOf, duplicateReason, duplicateBatchWith, overrideDuplicate, previewUrl, file } = active;
   const dateInvalid = dateTooOld(form.date);
   const blockedByDuplicate = duplicateReason !== null && !overrideDuplicate;
   const remainingAfterThis = docs.filter(d => !d.stored && d.id !== active.id).length;
@@ -395,7 +450,7 @@ export function CaptureView() {
   return (
     <div className="cap-wrap view-enter">
       <input ref={fileInputRef} type="file" multiple accept={[...ACCEPTED_UPLOAD_TYPES, ...ACCEPTED_UPLOAD_EXTENSIONS].join(',')} style={{ display: 'none' }}
-        onChange={(e) => { const files = Array.from(e.target.files ?? []); if (files.length) handleFiles(files); e.target.value = ''; }} />
+        onChange={(e) => { const files = Array.from(e.target.files ?? []); if (files.length) handleFiles(files, uploadKindRef.current); e.target.value = ''; }} />
 
       {/* Queue strip — only shown once there's more than one document to switch between */}
       {docs.length > 1 && (
@@ -412,7 +467,7 @@ export function CaptureView() {
               {i + 1}. {d.file.name.length > 18 ? `${d.file.name.slice(0, 16)}…` : d.file.name}
             </button>
           ))}
-          <button className="btn ghost sm" onClick={() => fileInputRef.current?.click()}><I.plus size={13} />{tr('Add more')}</button>
+          <button className="btn ghost sm" onClick={() => openUpload(active.kind)}><I.plus size={13} />{tr('Add more')}</button>
         </div>
       )}
 
@@ -420,7 +475,7 @@ export function CaptureView() {
       <div className="cap-toolbar">
         <button className="cap-tbtn" onClick={cancelActive}><I.chevL size={15} />{tr('Cancel')}</button>
         <button className="cap-tbtn" onClick={resetActive}><I.refresh size={14} />{tr('Reset')}</button>
-        {docs.length === 1 && <button className="cap-tbtn" onClick={() => fileInputRef.current?.click()}><I.plus size={14} />{tr('Add more')}</button>}
+        {docs.length === 1 && <button className="cap-tbtn" onClick={() => openUpload(active.kind)}><I.plus size={14} />{tr('Add more')}</button>}
         <div className="spacer" />
         {confidence != null && <Badge tone={confidence >= 80 ? 'green' : confidence >= 60 ? 'amber' : 'red'}>{confidence}% {tr('extracted')}</Badge>}
         <button className="cap-store" onClick={store} disabled={extracting || storingId === active.id || blockedByDuplicate}>
@@ -483,111 +538,181 @@ export function CaptureView() {
       <div className="cap-panes">
         {/* LEFT — indexing form */}
         <div className="cap-form">
-          <CapField label={tr('Document Type')}><CapInput value={form.docType} readOnly /></CapField>
-          <CapField label={tr('Status')}><CapInput value={form.status} readOnly /></CapField>
-          <CapField label={tr('XML Status')}><CapInput value={form.xmlStatus} readOnly /></CapField>
+          {kind === 'special' ? (
+            <>
+              <CapField label={tr('Document Type')}><CapInput value={tr('Special Invoice')} readOnly /></CapField>
+              <CapField label={tr('Status')}><CapInput value={form.status} readOnly /></CapField>
 
-          <CapField label={tr('Date')} hlKey="date" activeField={activeField} onSelect={setActiveField}>
-            <CapDate value={form.date} onChange={v => set('date', v)} active invalid={dateInvalid} />
-            {dateInvalid && <div className="cap-err"><I.alert size={12} />{tr('Date is more than')} {MAX_DATE_AGE_MONTHS} {tr('months old — not accepted')}</div>}
-          </CapField>
-          <CapField label={tr('Due Date')} hlKey="dueDate" activeField={activeField} onSelect={setActiveField}>
-            <CapDate value={form.dueDate} onChange={v => set('dueDate', v)} />
-          </CapField>
+              <CapField label={tr('Date')} hlKey="date" activeField={activeField} onSelect={setActiveField}>
+                <CapDate value={form.date} onChange={v => set('date', v)} active invalid={dateInvalid} />
+                {dateInvalid && <div className="cap-err"><I.alert size={12} />{tr('Date is more than')} {MAX_DATE_AGE_MONTHS} {tr('months old — not accepted')}</div>}
+              </CapField>
+              <CapField label={tr('Due Date')} hlKey="dueDate" activeField={activeField} onSelect={setActiveField}>
+                <CapDate value={form.dueDate} onChange={v => set('dueDate', v)} />
+              </CapField>
 
-          <CapField label={tr('Vendor')} hlKey="vendor" activeField={activeField} onSelect={setActiveField}><CapInput value={form.vendor} onChange={v => set('vendor', v)} chevron /></CapField>
-          <CapField label={tr('Amount')} hlKey="total" activeField={activeField} onSelect={setActiveField}><CapInput value={form.amount} onChange={v => set('amount', v)} chevron /></CapField>
-          <CapField label={tr('Purchase Order Number')} hlKey="po" activeField={activeField} onSelect={setActiveField}><CapInput value={form.po} onChange={v => set('po', v)} chevron /></CapField>
-          <CapField label={tr('Company Code')} hlKey="companyCode" activeField={activeField} onSelect={setActiveField}>
-            <CapSelect value={form.companyCode} onChange={v => set('companyCode', v)} options={CAP_COMPANY_CODES} />
-            {!form.companyCode && <div className="cap-err"><I.alert size={12} />{tr('Not found on document — select the correct code')}</div>}
-          </CapField>
-          <CapField label={tr('Invoice Number')} hlKey="invoiceNo" activeField={activeField} onSelect={setActiveField}><CapInput value={form.invoiceNumber} onChange={v => set('invoiceNumber', v)} chevron /></CapField>
-          <CapField label={tr('Vendor Reference')} hlKey="vendorRef" activeField={activeField} onSelect={setActiveField}><CapInput value={form.vendorRef} onChange={v => set('vendorRef', v)} chevron /></CapField>
+              <CapField label={tr('Vendor')} hlKey="vendor" activeField={activeField} onSelect={setActiveField}><CapInput value={form.vendor} onChange={v => set('vendor', v)} chevron /></CapField>
+              <CapField label={tr('Amount')} hlKey="total" activeField={activeField} onSelect={setActiveField}><CapInput value={form.amount} onChange={v => set('amount', v)} chevron /></CapField>
+              <CapField label={tr('Purchase Order Number')} hlKey="po" activeField={activeField} onSelect={setActiveField}><CapInput value={form.po} onChange={v => set('po', v)} chevron /></CapField>
+              <CapField label={tr('Company Code')} hlKey="companyCode" activeField={activeField} onSelect={setActiveField}>
+                <CapSelect value={form.companyCode} onChange={v => set('companyCode', v)} options={CAP_COMPANY_CODES} />
+                {!form.companyCode && <div className="cap-err"><I.alert size={12} />{tr('Not found on document — select the correct code')}</div>}
+              </CapField>
+              <CapField label={tr('Invoice Number')} hlKey="invoiceNo" activeField={activeField} onSelect={setActiveField}><CapInput value={form.invoiceNumber} onChange={v => set('invoiceNumber', v)} chevron /></CapField>
+              <CapField label={tr('Vendor Reference')} hlKey="vendorRef" activeField={activeField} onSelect={setActiveField}><CapInput value={form.vendorRef} onChange={v => set('vendorRef', v)} chevron /></CapField>
+              <CapField label={tr('Document Number')}><CapInput value={form.documentNumber} onChange={v => set('documentNumber', v)} chevron /></CapField>
 
-          <CapField label={tr('SAP Posting Type')}>
-            <CapSelect value={form.sapPostingType} onChange={v => set('sapPostingType', v)} options={CAP_SAP_TYPES} />
-          </CapField>
-          <CapField label={tr('SAP Invoice Text')}>
-            <input className="cap-input" style={{ height: 'auto', paddingTop: 6, paddingBottom: 6, paddingRight: 9 }}
-              value={form.sapInvText} onChange={e => set('sapInvText', e.target.value)} placeholder="" />
-          </CapField>
-
-          <CapField label={tr('Stock / Non Stock')}>
-            <CapSelect value={form.stockType} onChange={v => set('stockType', v)} options={CAP_STOCK_TYPES} />
-          </CapField>
-          <CapField label={tr('Stock Document Number')}>
-            <CapInput value={form.stockDocNumber} onChange={v => set('stockDocNumber', v)} chevron
-              disabled={form.stockType === 'Non-stock'} />
-          </CapField>
-          <CapField label={tr('Non-Stock Document Number')}>
-            <CapSelect value={form.nonStockDocNumber} onChange={v => set('nonStockDocNumber', v)}
-              options={nonStockDocOptions(form.nonStockDocNumber)} disabled={form.stockType === 'Stock'} />
-          </CapField>
-
-          {/* Line items — extracted from the document by Gemini; review/edit before storing */}
-          <CapField label={tr('Line Items')} top>
-            <div className="cap-mat-head">
-              <span className="cap-mat-count">{lineItems.length} {tr('lines')}</span>
-              <div className="spacer" />
-              <button className="cap-mat-autofill" onClick={addLineItem}><I.plus size={13} />{tr('Add line')}</button>
-            </div>
-            <div className="cap-mat-table">
-              <div className="cap-li-row cap-mat-colhead">
-                <div>{tr('Description')}</div>
-                <div style={{ textAlign: 'right' }}>{tr('Qty')}</div>
-                <div style={{ textAlign: 'right' }}>{tr('Unit')}</div>
-                <div style={{ textAlign: 'right' }}>{tr('Amount')}</div>
-                <div>{tr('GL')}</div>
-                <div />
-              </div>
-              <div className="cap-mat-body">
-                {lineItems.map((li, i) => (
-                  <div key={i} className="cap-li-row cap-mat-row">
-                    <input className="cap-mat-input" value={li.description} placeholder={tr('Description')}
-                      onChange={e => updateLineItem(i, { description: e.target.value })} />
-                    <input className="cap-mat-input num" value={li.qty} placeholder={tr('Qty')}
-                      onChange={e => updateLineItem(i, { qty: Number(e.target.value) || 0 })} />
-                    <input className="cap-mat-input num" value={li.unitPrice} placeholder={tr('Unit')}
-                      onChange={e => updateLineItem(i, { unitPrice: Number(e.target.value) || 0 })} />
-                    <input className="cap-mat-input num" value={li.amount} placeholder={tr('Amount')}
-                      onChange={e => updateLineItem(i, { amount: Number(e.target.value) || 0 })} />
-                    <input className="cap-mat-input" value={li.glCode ?? ''} placeholder={tr('GL')}
-                      onChange={e => updateLineItem(i, { glCode: e.target.value || null })} />
-                    <button className="cap-mat-del" onClick={() => removeLineItem(i)}><I.x size={13} /></button>
+              {/* Material Code — replaces Line Items entirely for Special Invoice */}
+              <CapField label={tr('Material Code')} top>
+                <div className="cap-mat-head">
+                  <span className="cap-mat-count">{materialRows.length} {tr('rows')}</span>
+                  <div className="spacer" />
+                  <button className="cap-mat-autofill" onClick={addMaterialRow}><I.plus size={13} />{tr('Add row')}</button>
+                </div>
+                <div className="cap-mat-table">
+                  <div className="cap-li-row cap-mat-colhead">
+                    <div>{tr('Item')}</div>
+                    <div>{tr('Material')}</div>
+                    <div>{tr('Description')}</div>
+                    <div style={{ textAlign: 'right' }}>{tr('Total')}</div>
+                    <div>{tr('UOM')}</div>
+                    <div />
                   </div>
-                ))}
-                {lineItems.length === 0 && <div className="cap-mat-empty">{tr('No line items captured — add one manually if needed')}</div>}
-              </div>
-            </div>
-          </CapField>
-
-          {/* Material Code table */}
-          <CapField label={tr('Material Code')} top>
-            <div className="cap-mat-head">
-              <span className="cap-mat-count">{rows.length} {tr('rows')}</span>
-              <div className="spacer" />
-              <button className="cap-mat-autofill" onClick={() => toast('Autofill table')}><I.pin size={13} />{tr('Autofill Table')}</button>
-              <button className="cap-tbtn icon" title={tr('Table options')}><I.dashboard size={15} /></button>
-            </div>
-            <div className="cap-mat-table">
-              <div className="cap-mat-row cap-mat-colhead">
-                <div>{tr('Item')}</div>
-                <div>{tr('Material')}</div>
-              </div>
-              <div className="cap-mat-body">
-                <button className="cap-mat-add" onClick={() => setRows(rs => [...rs, { item: '', material: '' }])} title={tr('Add row')}><I.plus size={14} /></button>
-                {rows.map((r, i) => (
-                  <div key={i} className="cap-mat-row">
-                    <input className="cap-mat-input" value={r.item} placeholder={tr('Item')} onChange={e => setRows(rs => rs.map((x, j) => j === i ? { ...x, item: e.target.value } : x))} />
-                    <input className="cap-mat-input" value={r.material} placeholder={tr('Material')} onChange={e => setRows(rs => rs.map((x, j) => j === i ? { ...x, material: e.target.value } : x))} />
-                    <button className="cap-mat-del" onClick={() => setRows(rs => rs.filter((_, j) => j !== i))}><I.x size={13} /></button>
+                  <div className="cap-mat-body">
+                    {materialRows.map((r, i) => (
+                      <div key={i} className="cap-li-row cap-mat-row">
+                        <input className="cap-mat-input" value={r.item} placeholder={tr('Item')}
+                          onChange={e => updateMaterialRow(i, { item: e.target.value })} />
+                        <input className="cap-mat-input" value={r.material} placeholder={tr('Material')}
+                          onChange={e => updateMaterialRow(i, { material: e.target.value })} />
+                        <input className="cap-mat-input" value={r.description} placeholder={tr('Description')}
+                          onChange={e => updateMaterialRow(i, { description: e.target.value })} />
+                        <input className="cap-mat-input num" value={r.total} placeholder={tr('Total')}
+                          onChange={e => updateMaterialRow(i, { total: Number(e.target.value) || 0 })} />
+                        <input className="cap-mat-input" value={r.uom} placeholder={tr('UOM')}
+                          onChange={e => updateMaterialRow(i, { uom: e.target.value })} />
+                        <button className="cap-mat-del" onClick={() => removeMaterialRow(i)}><I.x size={13} /></button>
+                      </div>
+                    ))}
+                    {materialRows.length === 0 && <div className="cap-mat-empty">{tr('No material lines captured — add one manually if needed')}</div>}
                   </div>
-                ))}
-                {rows.length === 0 && <div className="cap-mat-empty">{tr('No material lines')}</div>}
-              </div>
-            </div>
-          </CapField>
+                </div>
+              </CapField>
+
+              <CapField label={tr('Comment')}>
+                <input className="cap-input" style={{ height: 'auto', paddingTop: 6, paddingBottom: 6, paddingRight: 9 }}
+                  value={form.comment} onChange={e => set('comment', e.target.value)} placeholder="" />
+              </CapField>
+            </>
+          ) : (
+            <>
+              <CapField label={tr('Document Type')}><CapInput value={form.docType} readOnly /></CapField>
+              <CapField label={tr('Status')}><CapInput value={form.status} readOnly /></CapField>
+              <CapField label={tr('XML Status')}><CapInput value={form.xmlStatus} readOnly /></CapField>
+
+              <CapField label={tr('Date')} hlKey="date" activeField={activeField} onSelect={setActiveField}>
+                <CapDate value={form.date} onChange={v => set('date', v)} active invalid={dateInvalid} />
+                {dateInvalid && <div className="cap-err"><I.alert size={12} />{tr('Date is more than')} {MAX_DATE_AGE_MONTHS} {tr('months old — not accepted')}</div>}
+              </CapField>
+              <CapField label={tr('Due Date')} hlKey="dueDate" activeField={activeField} onSelect={setActiveField}>
+                <CapDate value={form.dueDate} onChange={v => set('dueDate', v)} />
+              </CapField>
+
+              <CapField label={tr('Vendor')} hlKey="vendor" activeField={activeField} onSelect={setActiveField}><CapInput value={form.vendor} onChange={v => set('vendor', v)} chevron /></CapField>
+              <CapField label={tr('Amount')} hlKey="total" activeField={activeField} onSelect={setActiveField}><CapInput value={form.amount} onChange={v => set('amount', v)} chevron /></CapField>
+              <CapField label={tr('Purchase Order Number')} hlKey="po" activeField={activeField} onSelect={setActiveField}><CapInput value={form.po} onChange={v => set('po', v)} chevron /></CapField>
+              <CapField label={tr('Company Code')} hlKey="companyCode" activeField={activeField} onSelect={setActiveField}>
+                <CapSelect value={form.companyCode} onChange={v => set('companyCode', v)} options={CAP_COMPANY_CODES} />
+                {!form.companyCode && <div className="cap-err"><I.alert size={12} />{tr('Not found on document — select the correct code')}</div>}
+              </CapField>
+              <CapField label={tr('Invoice Number')} hlKey="invoiceNo" activeField={activeField} onSelect={setActiveField}><CapInput value={form.invoiceNumber} onChange={v => set('invoiceNumber', v)} chevron /></CapField>
+              <CapField label={tr('Vendor Reference')} hlKey="vendorRef" activeField={activeField} onSelect={setActiveField}><CapInput value={form.vendorRef} onChange={v => set('vendorRef', v)} chevron /></CapField>
+
+              <CapField label={tr('SAP Posting Type')}>
+                <CapSelect value={form.sapPostingType} onChange={v => set('sapPostingType', v)} options={CAP_SAP_TYPES} />
+              </CapField>
+              <CapField label={tr('SAP Invoice Text')}>
+                <input className="cap-input" style={{ height: 'auto', paddingTop: 6, paddingBottom: 6, paddingRight: 9 }}
+                  value={form.sapInvText} onChange={e => set('sapInvText', e.target.value)} placeholder="" />
+              </CapField>
+
+              <CapField label={tr('Stock / Non Stock')}>
+                <CapSelect value={form.stockType} onChange={v => set('stockType', v)} options={CAP_STOCK_TYPES} />
+              </CapField>
+              <CapField label={tr('Stock Document Number')}>
+                <CapInput value={form.stockDocNumber} onChange={v => set('stockDocNumber', v)} chevron
+                  disabled={form.stockType === 'Non-stock'} />
+              </CapField>
+              <CapField label={tr('Non-Stock Document Number')}>
+                <CapSelect value={form.nonStockDocNumber} onChange={v => set('nonStockDocNumber', v)}
+                  options={nonStockDocOptions(form.nonStockDocNumber)} disabled={form.stockType === 'Stock'} />
+              </CapField>
+
+              {/* Line items — extracted from the document by Gemini; review/edit before storing */}
+              <CapField label={tr('Line Items')} top>
+                <div className="cap-mat-head">
+                  <span className="cap-mat-count">{lineItems.length} {tr('lines')}</span>
+                  <div className="spacer" />
+                  <button className="cap-mat-autofill" onClick={addLineItem}><I.plus size={13} />{tr('Add line')}</button>
+                </div>
+                <div className="cap-mat-table">
+                  <div className="cap-li-row cap-mat-colhead">
+                    <div>{tr('Description')}</div>
+                    <div style={{ textAlign: 'right' }}>{tr('Qty')}</div>
+                    <div style={{ textAlign: 'right' }}>{tr('Unit')}</div>
+                    <div style={{ textAlign: 'right' }}>{tr('Amount')}</div>
+                    <div>{tr('GL')}</div>
+                    <div />
+                  </div>
+                  <div className="cap-mat-body">
+                    {lineItems.map((li, i) => (
+                      <div key={i} className="cap-li-row cap-mat-row">
+                        <input className="cap-mat-input" value={li.description} placeholder={tr('Description')}
+                          onChange={e => updateLineItem(i, { description: e.target.value })} />
+                        <input className="cap-mat-input num" value={li.qty} placeholder={tr('Qty')}
+                          onChange={e => updateLineItem(i, { qty: Number(e.target.value) || 0 })} />
+                        <input className="cap-mat-input num" value={li.unitPrice} placeholder={tr('Unit')}
+                          onChange={e => updateLineItem(i, { unitPrice: Number(e.target.value) || 0 })} />
+                        <input className="cap-mat-input num" value={li.amount} placeholder={tr('Amount')}
+                          onChange={e => updateLineItem(i, { amount: Number(e.target.value) || 0 })} />
+                        <input className="cap-mat-input" value={li.glCode ?? ''} placeholder={tr('GL')}
+                          onChange={e => updateLineItem(i, { glCode: e.target.value || null })} />
+                        <button className="cap-mat-del" onClick={() => removeLineItem(i)}><I.x size={13} /></button>
+                      </div>
+                    ))}
+                    {lineItems.length === 0 && <div className="cap-mat-empty">{tr('No line items captured — add one manually if needed')}</div>}
+                  </div>
+                </div>
+              </CapField>
+
+              {/* Material Code table */}
+              <CapField label={tr('Material Code')} top>
+                <div className="cap-mat-head">
+                  <span className="cap-mat-count">{rows.length} {tr('rows')}</span>
+                  <div className="spacer" />
+                  <button className="cap-mat-autofill" onClick={() => toast('Autofill table')}><I.pin size={13} />{tr('Autofill Table')}</button>
+                  <button className="cap-tbtn icon" title={tr('Table options')}><I.dashboard size={15} /></button>
+                </div>
+                <div className="cap-mat-table">
+                  <div className="cap-mat-row cap-mat-colhead">
+                    <div>{tr('Item')}</div>
+                    <div>{tr('Material')}</div>
+                  </div>
+                  <div className="cap-mat-body">
+                    <button className="cap-mat-add" onClick={() => setRows(rs => [...rs, { item: '', material: '' }])} title={tr('Add row')}><I.plus size={14} /></button>
+                    {rows.map((r, i) => (
+                      <div key={i} className="cap-mat-row">
+                        <input className="cap-mat-input" value={r.item} placeholder={tr('Item')} onChange={e => setRows(rs => rs.map((x, j) => j === i ? { ...x, item: e.target.value } : x))} />
+                        <input className="cap-mat-input" value={r.material} placeholder={tr('Material')} onChange={e => setRows(rs => rs.map((x, j) => j === i ? { ...x, material: e.target.value } : x))} />
+                        <button className="cap-mat-del" onClick={() => setRows(rs => rs.filter((_, j) => j !== i))}><I.x size={13} /></button>
+                      </div>
+                    ))}
+                    {rows.length === 0 && <div className="cap-mat-empty">{tr('No material lines')}</div>}
+                  </div>
+                </div>
+              </CapField>
+            </>
+          )}
         </div>
 
         {/* RIGHT — document viewer */}

@@ -6,6 +6,7 @@ import { getCurrentAppUser } from '@/lib/server/users';
 import { createWorkflowInstance } from '@/lib/server/workflows';
 import { recordAuditEvent } from '@/lib/server/audit';
 import { uploadInvoiceDocument, getDocumentUrl } from '@/lib/server/storage';
+import { storeInvoiceInDocuWare } from '@/lib/server/docuware';
 import type { InvoiceRow, InvoiceLineItemRow, AuditChange } from '@/lib/supabase/types';
 
 export interface InvoiceWithLineItems extends InvoiceRow {
@@ -237,6 +238,11 @@ export async function createInvoiceFromExtraction(input: CaptureStoreInput, file
     icon: 'upload',
     tone: 'blue',
   });
+
+  // Hands off to DocuWare's own storage + XML-export automation — never
+  // blocks/fails the capture itself if the hand-off fails (see
+  // storeInvoiceInDocuWare's xml_status update on failure).
+  await storeInvoiceInDocuWare(invoice, file);
 
   return invoice;
 }

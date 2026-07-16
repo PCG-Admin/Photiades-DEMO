@@ -39,10 +39,10 @@ export async function getInvoiceAging(): Promise<AgingBucket[]> {
 // ---------- T144: Approval SLA (time spent at each workflow task) ----------
 export interface SlaRow { taskName: string; avgHours: number; count: number }
 
-export async function getApprovalSLA(): Promise<SlaRow[]> {
-  const { data: history, error } = await createServiceClient()
-    .from('workflow_history').select('*').order('instance_id').order('occurred_at')
-    .overrideTypes<WorkflowHistoryRow[], { merge: false }>();
+export async function getApprovalSLA(since?: string | null): Promise<SlaRow[]> {
+  let query = createServiceClient().from('workflow_history').select('*').order('instance_id').order('occurred_at');
+  if (since) query = query.gte('occurred_at', since);
+  const { data: history, error } = await query.overrideTypes<WorkflowHistoryRow[], { merge: false }>();
   if (error) throw error;
 
   const durationsByTask = new Map<string, number[]>();
@@ -67,10 +67,10 @@ export async function getApprovalSLA(): Promise<SlaRow[]> {
 // ---------- T145: Approver Performance (volume / turnaround per approver) ----------
 export interface ApproverPerformanceRow { actorName: string; actions: number; avgTurnaroundHours: number | null }
 
-export async function getApproverPerformance(): Promise<ApproverPerformanceRow[]> {
-  const { data: history, error } = await createServiceClient()
-    .from('workflow_history').select('*').order('instance_id').order('occurred_at')
-    .overrideTypes<WorkflowHistoryRow[], { merge: false }>();
+export async function getApproverPerformance(since?: string | null): Promise<ApproverPerformanceRow[]> {
+  let query = createServiceClient().from('workflow_history').select('*').order('instance_id').order('occurred_at');
+  if (since) query = query.gte('occurred_at', since);
+  const { data: history, error } = await query.overrideTypes<WorkflowHistoryRow[], { merge: false }>();
   if (error) throw error;
 
   const byActor = new Map<string, { actions: number; turnarounds: number[] }>();
@@ -96,11 +96,11 @@ export async function getApproverPerformance(): Promise<ApproverPerformanceRow[]
 // ---------- T146: Declined Invoices trend ----------
 export interface DeclinedRow { code: string; vendor: string; amount: number; taskName: string; reason: string; when: string }
 
-export async function getDeclinedTrend(): Promise<DeclinedRow[]> {
+export async function getDeclinedTrend(since?: string | null): Promise<DeclinedRow[]> {
   const supabase = createServiceClient();
-  const { data: history, error } = await supabase
-    .from('workflow_history').select('*').eq('action_key', 'declined').order('occurred_at', { ascending: false })
-    .overrideTypes<WorkflowHistoryRow[], { merge: false }>();
+  let query = supabase.from('workflow_history').select('*').eq('action_key', 'declined').order('occurred_at', { ascending: false });
+  if (since) query = query.gte('occurred_at', since);
+  const { data: history, error } = await query.overrideTypes<WorkflowHistoryRow[], { merge: false }>();
   if (error) throw error;
   if (history.length === 0) return [];
 

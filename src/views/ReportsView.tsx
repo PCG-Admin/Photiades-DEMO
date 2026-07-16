@@ -2,8 +2,8 @@
 
 import { useEffect, useId, useMemo, useState } from 'react';
 import { I, type IconComponent } from '@/components/icons';
-import { Badge, MiniStat, PageHeader, Pagination, usePagination } from '@/components/ui';
-import { fmtMoney, cx } from '@/lib/utils';
+import { Badge, MiniStat, PageHeader, Pagination, Segmented, usePagination } from '@/components/ui';
+import { fmtMoney } from '@/lib/utils';
 import { fmtDate } from '@/lib/format';
 import { downloadCsv } from '@/lib/csv';
 import { downloadXlsx } from '@/lib/xlsx';
@@ -14,42 +14,73 @@ import {
 } from '@/lib/server/reports';
 import type { InvoiceRow } from '@/lib/supabase/types';
 
-const TABS: { key: string; label: string; icon: IconComponent }[] = [
-  { key: 'Invoice Aging', label: 'Invoice Aging', icon: I.calendar },
-  { key: 'Approval SLA', label: 'Approval SLA', icon: I.clock },
-  { key: 'Approver Performance', label: 'Approver Performance', icon: I.users },
-  { key: 'Declined Invoices', label: 'Declined Invoices', icon: I.x },
-  { key: 'Pending Payments', label: 'Pending Payments', icon: I.building },
-  { key: 'Custom Export', label: 'Custom Export', icon: I.filter },
+const PERIODS: { key: string; label: string; days: number | null }[] = [
+  { key: 'all', label: 'All time', days: null },
+  { key: '30', label: 'Last 30 days', days: 30 },
+  { key: '90', label: 'Last 90 days', days: 90 },
+  { key: '365', label: 'Last 12 months', days: 365 },
 ];
-type Tab = typeof TABS[number]['key'];
 
 // =================== REPORTS — SOW §5.6 ===================
+// All six reports on one scrolling page (previously behind tabs) with a
+// single period filter at the top — applies to the history-driven reports
+// (Approval SLA / Approver Performance / Declined Invoices), since those
+// aggregate dated workflow_history rows. Invoice Aging and Pending Payments
+// are current-state snapshots ("what's outstanding right now"), so the
+// period filter doesn't apply to them; Custom Export has its own
+// vendor/status filters and stays a separate section at the bottom.
+const EXPORT_STATUSES = ['Awaiting Approval', 'Pending Payment', 'Order not placed via PD', 'Approved', 'Paid Invoice', 'Declined'];
+
 export function ReportsView() {
   const tr = useTr();
-  const [tab, setTab] = useState<Tab>('Invoice Aging');
+  const [periodKey, setPeriodKey] = useState('all');
+  const periodDays = PERIODS.find(p => p.key === periodKey)?.days ?? null;
+
+  // Custom Export's filters live here (not inside CustomExportReport) so
+  // every filter control on this page — period AND vendor/status — sits in
+  // one bar at the top, instead of a second, disconnected filter row way
+  // down at the bottom of the page.
+  const [exportFilters, setExportFilters] = useState<InvoiceExportFilters>({});
+  const [exportRows, setExportRows] = useState<InvoiceRow[] | null>(null);
+  const [exportRunning, setExportRunning] = useState(false);
+  async function runExport() {
+    setExportRunning(true);
+    setExportRows(await exportInvoices(exportFilters));
+    setExportRunning(false);
+  }
 
   return (
     <div className="view-enter">
       <PageHeader title={tr('Reports & Analytics')} sub={tr('The six SOW §5.6 reports — Invoice Aging, Approval SLA, Approver Performance, Declined Invoices, Pending Payments, and a custom filter export.')} />
 
-      <div className="tabs" style={{ marginBottom: 'var(--gap-5)' }}>
-        {TABS.map(t => {
-          const Ico = t.icon;
-          return (
-            <button key={t.key} className={cx('tab', tab === t.key && 'on')} onClick={() => setTab(t.key)}>
-              <span className="row" style={{ gap: 7, display: 'inline-flex', alignItems: 'center' }}><Ico size={14} />{tr(t.label)}</span>
-            </button>
-          );
-        })}
+      <div className="card card-pad" style={{ marginBottom: 'var(--gap-6)', display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <div className="row" style={{ gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+          <span className="muted" style={{ fontSize: 12.5, fontWeight: 600 }}>{tr('Period')}</span>
+          <Segmented options={PERIODS.map(p => ({ value: p.key, label: tr(p.label) }))} value={periodKey} onChange={(v) => setPeriodKey(String(v))} />
+          <span className="faint" style={{ fontSize: 11.5 }}>{tr('Applies to Approval SLA, Approver Performance, and Declined Invoices')}</span>
+        </div>
+        <div className="divider" />
+        <div className="row" style={{ gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+          <span className="muted" style={{ fontSize: 12.5, fontWeight: 600 }}>{tr('Custom export')}</span>
+          <input className="input" placeholder={tr('Vendor contains…')} style={{ maxWidth: 220 }}
+            value={exportFilters.vendor ?? ''} onChange={e => setExportFilters(f => ({ ...f, vendor: e.target.value || undefined }))} />
+          <select className="input" style={{ maxWidth: 200 }} value={exportFilters.status ?? ''} onChange={e => setExportFilters(f => ({ ...f, status: e.target.value || undefined }))}>
+            <option value="">{tr('Any status')}</option>
+            {EXPORT_STATUSES.map(s => <option key={s} value={s}>{tr(s)}</option>)}
+          </select>
+          <button className="btn primary" onClick={runExport} disabled={exportRunning}><I.filter size={15} />{exportRunning ? tr('Running…') : tr('Run')}</button>
+          <span className="faint" style={{ fontSize: 11.5 }}>{tr('Feeds the Custom Export section below')}</span>
+        </div>
       </div>
 
-      {tab === 'Invoice Aging' && <InvoiceAgingReport />}
-      {tab === 'Approval SLA' && <ApprovalSlaReport />}
-      {tab === 'Approver Performance' && <ApproverPerformanceReport />}
-      {tab === 'Declined Invoices' && <DeclinedInvoicesReport />}
-      {tab === 'Pending Payments' && <PendingPaymentsReport />}
-      {tab === 'Custom Export' && <CustomExportReport />}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--gap-6)' }}>
+        <InvoiceAgingReport />
+        <ApprovalSlaReport periodDays={periodDays} />
+        <ApproverPerformanceReport periodDays={periodDays} />
+        <DeclinedInvoicesReport periodDays={periodDays} />
+        <PendingPaymentsReport />
+        <CustomExportReport rows={exportRows} />
+      </div>
     </div>
   );
 }
@@ -86,24 +117,59 @@ export function ExportButtons({ data, filename }: { data: Record<string, unknown
   );
 }
 
-/** Single-series ranked horizontal bars, direct-labelled (never color alone)
- * — used for Approval SLA / Approver Performance / Invoice Aging. One hue
- * per report; only Invoice Aging varies opacity across bars to encode
- * ordinal severity (not yet due → 90+ days), since that's a real status
- * progression, not an arbitrary categorical split. */
-function RankedBars({ items }: { items: { label: string; value: number; displayValue: string; color: string }[] }) {
+/** Single-series vertical column chart, direct-labelled (never color
+ * alone) — used for Approval SLA / Approver Performance / Invoice Aging.
+ * Plain flexbox columns (not SVG) so it genuinely fills the available card
+ * width — each bar is a flex:1 track, dividing whatever space exists evenly
+ * — down to a minimum readable width, below which it scrolls horizontally
+ * instead of squeezing columns unreadably thin. One hue per report; only
+ * Invoice Aging varies opacity across bars to encode ordinal severity (not
+ * yet due → 90+ days), since that's a real status progression, not an
+ * arbitrary categorical split. */
+function ColumnChart({ items, valueFmt = (v: number) => String(v) }: {
+  items: { label: string; value: number; displayValue: string; color: string }[];
+  valueFmt?: (v: number) => string;
+}) {
   const max = Math.max(...items.map(i => i.value), 1);
+  const TRACK_H = 160;
+  const gridFracs = [1, 0.75, 0.5, 0.25, 0];
+  const MIN_COL_W = 76;
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 11, background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 10, padding: 18 }}>
-      {items.map(item => (
-        <div key={item.label} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <div style={{ width: 168, fontSize: 12.5, color: 'var(--text-2)', flexShrink: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={item.label}>{item.label}</div>
-          <div style={{ flex: 1, height: 20, background: 'var(--surface)', borderRadius: 5, position: 'relative', overflow: 'hidden', border: '1px solid var(--border)' }}>
-            <div style={{ position: 'absolute', inset: 0, width: `${Math.max(2, (item.value / max) * 100)}%`, background: item.color, borderRadius: 5, transition: 'width .5s cubic-bezier(.22,1,.36,1)' }} />
-          </div>
-          <div className="mono" style={{ width: 76, textAlign: 'right', fontSize: 12.5, fontWeight: 600, flexShrink: 0 }}>{item.displayValue}</div>
+    <div style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 10, padding: '18px 20px 14px', overflowX: 'auto' }}>
+      <div style={{ display: 'flex', minWidth: items.length * MIN_COL_W }}>
+        <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', height: TRACK_H, paddingRight: 10, flexShrink: 0 }}>
+          {gridFracs.map(f => (
+            <span key={f} className="mono" style={{ fontSize: 10.5, color: 'var(--muted)', lineHeight: 1 }}>{valueFmt(max * f)}</span>
+          ))}
         </div>
-      ))}
+        <div style={{ display: 'flex', flex: 1, gap: 10 }}>
+          {items.map(item => {
+            // A genuine 0 renders as no visible bar at all — a forced
+            // minimum height previously drew a confusing little sliver that
+            // looked like a rendering glitch for zero-value categories.
+            const pct = item.value > 0 ? Math.max(1.5, (item.value / max) * 100) : 0;
+            return (
+              <div key={item.label} style={{ flex: 1, minWidth: MIN_COL_W - 10, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                <div style={{ fontSize: 12, fontWeight: 700, fontFamily: 'var(--mono)', marginBottom: 6, whiteSpace: 'nowrap' }}>{item.displayValue}</div>
+                <div style={{ height: TRACK_H, width: '100%', display: 'flex', alignItems: 'flex-end', borderLeft: '1px solid var(--border)', position: 'relative' }}>
+                  {gridFracs.slice(1).map(f => (
+                    <div key={f} style={{ position: 'absolute', left: 0, right: 0, bottom: `${f * 100}%`, height: 1, background: 'var(--border)' }} />
+                  ))}
+                  {pct > 0 && (
+                    <div title={`${item.label} — ${item.displayValue}`} style={{
+                      width: '70%', margin: '0 auto', height: `${pct}%`, minHeight: 4,
+                      background: item.color, borderRadius: '6px 6px 0 0',
+                      transition: 'height .5s cubic-bezier(.22,1,.36,1)',
+                    }} />
+                  )}
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 8, textAlign: 'center', lineHeight: 1.3 }}>{item.label}</div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
     </div>
   );
 }
@@ -191,6 +257,7 @@ function InvoiceAgingReport() {
   const totalOutstanding = data?.reduce((s, b) => s + b.total, 0) ?? 0;
   const totalCount = data?.reduce((s, b) => s + b.count, 0) ?? 0;
   const overdueTotal = data?.filter(b => !b.label.startsWith('Not yet due')).reduce((s, b) => s + b.total, 0) ?? 0;
+  const chartItems = data?.map(b => ({ label: b.label, value: b.total, displayValue: fmtMoney(b.total), color: severityColor(b.label) })) ?? [];
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--gap-5)' }}>
@@ -206,7 +273,7 @@ function InvoiceAgingReport() {
         {data && (
           data.every(b => b.count === 0) ? <div className="faint" style={{ fontSize: 13 }}>{tr('No outstanding invoices.')}</div> : (
             <>
-              <RankedBars items={data.map(b => ({ label: b.label, value: b.total, displayValue: fmtMoney(b.total), color: severityColor(b.label) }))} />
+              <ColumnChart items={chartItems} valueFmt={fmtMoney} />
               <table className="tbl" style={{ marginTop: 22 }}>
                 <thead><tr><th>{tr('Bucket')}</th><th className="right">{tr('Invoices')}</th><th className="right">{tr('Total outstanding')}</th></tr></thead>
                 <tbody>
@@ -228,10 +295,15 @@ function InvoiceAgingReport() {
 }
 
 // ---------- T144: Approval SLA ----------
-function ApprovalSlaReport() {
+function ApprovalSlaReport({ periodDays }: { periodDays: number | null }) {
   const tr = useTr();
   const [data, setData] = useState<SlaRow[] | null>(null);
-  useEffect(() => { getApprovalSLA().then(setData); }, []);
+  useEffect(() => {
+    const since = periodDays ? new Date(Date.now() - periodDays * 86_400_000).toISOString() : null;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setData(null);
+    getApprovalSLA(since).then(setData);
+  }, [periodDays]);
 
   return (
     <ReportCard title={tr('Approval SLA')} sub={tr('Average time spent at each workflow task')} icon={I.clock} loading={!data}
@@ -239,7 +311,7 @@ function ApprovalSlaReport() {
       {data && (
         data.length === 0 ? <div className="faint" style={{ fontSize: 13 }}>{tr('No completed task transitions yet.')}</div> : (
           <>
-            <RankedBars items={data.map(r => ({ label: r.taskName, value: r.avgHours, displayValue: fmtHours(r.avgHours), color: 'var(--accent)' }))} />
+            <ColumnChart items={data.map(r => ({ label: r.taskName, value: r.avgHours, displayValue: fmtHours(r.avgHours), color: 'var(--accent)' }))} valueFmt={fmtHours} />
             <table className="tbl" style={{ marginTop: 22 }}>
               <thead><tr><th>{tr('Task')}</th><th className="right">{tr('Avg. time at task')}</th><th className="right">{tr('Decisions')}</th></tr></thead>
               <tbody>
@@ -260,10 +332,15 @@ function ApprovalSlaReport() {
 }
 
 // ---------- T145: Approver Performance ----------
-function ApproverPerformanceReport() {
+function ApproverPerformanceReport({ periodDays }: { periodDays: number | null }) {
   const tr = useTr();
   const [data, setData] = useState<ApproverPerformanceRow[] | null>(null);
-  useEffect(() => { getApproverPerformance().then(setData); }, []);
+  useEffect(() => {
+    const since = periodDays ? new Date(Date.now() - periodDays * 86_400_000).toISOString() : null;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setData(null);
+    getApproverPerformance(since).then(setData);
+  }, [periodDays]);
 
   return (
     <ReportCard title={tr('Approver Performance')} sub={tr('Volume and turnaround per approver')} icon={I.users} loading={!data}
@@ -271,7 +348,7 @@ function ApproverPerformanceReport() {
       {data && (
         data.length === 0 ? <div className="faint" style={{ fontSize: 13 }}>{tr('No workflow actions recorded yet.')}</div> : (
           <>
-            <RankedBars items={data.map(r => ({ label: r.actorName, value: r.actions, displayValue: String(r.actions), color: 'var(--teal)' }))} />
+            <ColumnChart items={data.map(r => ({ label: r.actorName, value: r.actions, displayValue: String(r.actions), color: 'var(--teal)' }))} valueFmt={(v) => String(Math.round(v))} />
             <table className="tbl" style={{ marginTop: 22 }}>
               <thead><tr><th>{tr('Approver')}</th><th className="right">{tr('Actions')}</th><th className="right">{tr('Avg. turnaround')}</th></tr></thead>
               <tbody>
@@ -292,10 +369,15 @@ function ApproverPerformanceReport() {
 }
 
 // ---------- T146: Declined Invoices trend ----------
-function DeclinedInvoicesReport() {
+function DeclinedInvoicesReport({ periodDays }: { periodDays: number | null }) {
   const tr = useTr();
   const [data, setData] = useState<DeclinedRow[] | null>(null);
-  useEffect(() => { getDeclinedTrend().then(setData); }, []);
+  useEffect(() => {
+    const since = periodDays ? new Date(Date.now() - periodDays * 86_400_000).toISOString() : null;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setData(null);
+    getDeclinedTrend(since).then(setData);
+  }, [periodDays]);
   const totalValue = data?.reduce((s, r) => s + r.amount, 0) ?? 0;
   const { page, setPage, totalPages, pageItems, total: totalRows, pageSize } = usePagination(data ?? []);
 
@@ -408,18 +490,12 @@ function PendingPaymentsReport() {
 }
 
 // ---------- T148: Custom filter export ----------
-function CustomExportReport() {
+// Filter inputs (vendor/status) and the Run button live in ReportsView's
+// top filter bar, alongside Period — this section just shows the results
+// of the last run, lets you choose which fields to include, and exports.
+function CustomExportReport({ rows }: { rows: InvoiceRow[] | null }) {
   const tr = useTr();
-  const [filters, setFilters] = useState<InvoiceExportFilters>({});
-  const [rows, setRows] = useState<InvoiceRow[] | null>(null);
   const [fields, setFields] = useState<Record<string, boolean>>({ code: true, vendor: true, total: true, status: true, due_at: true });
-  const [running, setRunning] = useState(false);
-
-  async function run() {
-    setRunning(true);
-    setRows(await exportInvoices(filters));
-    setRunning(false);
-  }
 
   const allFields: (keyof InvoiceRow)[] = ['code', 'vendor', 'invoice_no', 'po', 'total', 'status', 'received_at', 'due_at', 'dept', 'company_code', 'stock_type'];
 
@@ -432,15 +508,7 @@ function CustomExportReport() {
         </div>
       </div>
       <div className="card-pad" style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-        <div className="row" style={{ gap: 10, flexWrap: 'wrap' }}>
-          <input className="input" placeholder={tr('Vendor contains…')} style={{ maxWidth: 220 }}
-            value={filters.vendor ?? ''} onChange={e => setFilters(f => ({ ...f, vendor: e.target.value || undefined }))} />
-          <select className="input" style={{ maxWidth: 200 }} value={filters.status ?? ''} onChange={e => setFilters(f => ({ ...f, status: e.target.value || undefined }))}>
-            <option value="">{tr('Any status')}</option>
-            {['Awaiting Approval', 'In Review', 'Approved', 'Paid', 'Exception', 'Processing', 'Pending Payment', 'At AcDep', 'Order not placed via PD', 'Paid Invoice', 'Declined'].map(s => <option key={s} value={s}>{tr(s)}</option>)}
-          </select>
-          <button className="btn primary" onClick={run} disabled={running}><I.filter size={15} />{running ? tr('Running…') : tr('Run')}</button>
-        </div>
+        {rows === null && <div className="faint" style={{ fontSize: 13 }}>{tr('Set your filters above and click Run to preview results here.')}</div>}
 
         <div>
           <div className="muted" style={{ fontSize: 12, fontWeight: 600, letterSpacing: '0.03em', textTransform: 'uppercase', marginBottom: 10 }}>{tr('Fields to include')}</div>

@@ -265,11 +265,26 @@ export async function advanceWorkflowTask(instanceId: string, actionKey: string,
         instancePatch = { status: 'Pending Payment' };
         invoicePatch.status = 'Pending Payment';
         break;
+      case 'sendPendPmt': {
+        // Special Invoice's "Pend. Pmt" outcome (AcDep-Check and
+        // AcDep-Approval) — unlike Stock/Non-Stock's 'pendPmt', this one
+        // actually routes on to the AcDep-PendPmt holding task (toTaskId),
+        // so both the status AND the task_idx need to move.
+        invoicePatch.status = 'Pending Payment';
+        if (!action.toTaskId) throw new Error(`"${action.label}" on task "${task.name}" has no toTaskId.`);
+        const idx = tasks.findIndex(t => t.id === action.toTaskId);
+        if (idx === -1) throw new Error(`Unknown target task "${action.toTaskId}".`);
+        instancePatch = { task_idx: idx, status: 'In Progress', ...(await resolveAssignee(tasks[idx].id, invoice.total, tasks[idx].role)) };
+        break;
+      }
       case 'paidDirect':
-        // Special Invoice's AcDep-Approval "Paid" — completes the workflow
-        // immediately, bypassing the AcDep-PendPmt holding task entirely.
+      case 'paid':
+        // Special Invoice's AcDep-Approval "Paid" (bypasses the
+        // AcDep-PendPmt holding task) and AcDep-PendPmt's own "Paid" —
+        // both mean the invoice has actually been paid out, not merely
+        // approved, so the invoice lands on 'Paid Invoice', not 'Approved'.
         instancePatch = { status: 'Completed' };
-        invoicePatch.status = 'Approved';
+        invoicePatch.status = 'Paid Invoice';
         break;
       case 'reassignReqner': {
         // Special Invoice's Req/ner-Approval "Send to Req/ner" — reassigns

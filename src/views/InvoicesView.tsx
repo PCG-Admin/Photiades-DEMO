@@ -55,7 +55,11 @@ export function InvoicesView({ initialInvoices, initialId = null }: { initialInv
     setSelectedCode(null);
   }
 
-  const tabs = ['All', 'Awaiting Approval', 'In Review', 'Exception', 'At AcDep', 'Pend. Pmt', 'Orders not placed by PD', 'Paid Invoice'];
+  // Only statuses the workflow engine can actually produce (see
+  // advanceWorkflowTask) — 'In Review'/'Exception'/'At AcDep'/'Processing'
+  // are defined in the DB check constraint but no code path ever sets them,
+  // so a tab for them would always show 0 and never populate.
+  const tabs = ['All', 'Awaiting Approval', 'Pend. Pmt', 'Orders not placed by PD', 'Approved', 'Paid Invoice', 'Declined'];
   const tabStatus: Record<string, string> = { 'Pend. Pmt': 'Pending Payment', 'Orders not placed by PD': 'Order not placed via PD' };
   const statusFor = (t: string) => tabStatus[t] || t;
   const tabCount = (t: string) => t === 'All' ? invoices.length : invoices.filter(i => i.status === statusFor(t)).length;
@@ -86,7 +90,7 @@ export function InvoicesView({ initialInvoices, initialId = null }: { initialInv
       {/* summary strip */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 'var(--gap-4)', marginBottom: 'var(--gap-5)' }}>
         <MiniStat label={tr('Total outstanding')} value={fmtMoney(invoices.filter(i => !['Paid Invoice', 'Paid'].includes(i.status)).reduce((s, i) => s + i.total, 0))} tone="blue" />
-        <MiniStat label={tr('At AcDep')} value={tabCount('At AcDep')} sub={tr('in accounts')} tone="amber" />
+        <MiniStat label={tr('Awaiting approval')} value={tabCount('Awaiting Approval')} sub={tr('action needed')} tone="amber" />
         <MiniStat label={tr('Pending payment')} value={tabCount('Pend. Pmt')} sub={tr('awaiting run')} tone="violet" />
         <MiniStat label={tr('Paid invoices')} value={tabCount('Paid Invoice')} sub={tr('settled')} tone="green" />
       </div>

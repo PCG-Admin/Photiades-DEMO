@@ -4,15 +4,18 @@ import { createServiceClient } from '@/lib/supabase/service';
 import { getCurrentAppUser } from '@/lib/server/users';
 import type { NotificationRow, AppUserRow } from '@/lib/supabase/types';
 
-/** Backs NotificationsView and the AppShell bell badge. There is no login
- * flow right now, so the GUEST_USER identity (see users.ts) has no real
- * app_users row to scope "your" notifications to — it sees every
- * notification in the system instead, same relaxation as Administrator
- * seeing every approval task. */
+/** Backs NotificationsView and the AppShell bell badge. Administrators see
+ * every notification in the system — same full-oversight bypass used by
+ * getApprovalsInbox/getAccessibleModules — since notifyRole() only ever
+ * targets the specific role a task is assigned to (never 'Administrator'
+ * itself), so without this bypass an Administrator account would never
+ * receive a single notification. The GUEST_USER fallback (no real app_users
+ * row — see users.ts) sees none, matching its least-privileged Viewer role. */
 export async function getNotificationsForCurrentUser(): Promise<NotificationRow[]> {
   const user = await getCurrentAppUser();
+  if (user.id === 'guest') return [];
   let query = createServiceClient().from('notifications').select('*').order('created_at', { ascending: false });
-  if (user.id !== 'guest') query = query.eq('user_id', user.id);
+  if (user.role !== 'Administrator') query = query.eq('user_id', user.id);
   const { data, error } = await query.overrideTypes<NotificationRow[], { merge: false }>();
   if (error) throw error;
   return data;

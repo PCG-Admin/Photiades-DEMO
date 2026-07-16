@@ -16,6 +16,10 @@ export async function login(_prev: LoginState, formData: FormData): Promise<Logi
   const supabase = await createClient();
   const { error } = await supabase.auth.signInWithPassword({ email, password });
   if (error) {
+    // No signed-in session exists at this point, so recordAuditEvent's
+    // getCurrentAppUser() resolves to the Viewer-role guest fallback — the
+    // attempted email is recorded as the target since there's no actor id.
+    await recordAuditEvent({ action: 'Failed sign-in attempt', module: 'Auth', target: email, icon: 'alert', tone: 'red' });
     return { error: error.message === 'Invalid login credentials' ? 'Invalid email or password.' : errorMessage(error) };
   }
 

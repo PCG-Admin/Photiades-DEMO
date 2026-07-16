@@ -7,6 +7,7 @@ import { getCurrentAppUser, findAppUserByName } from '@/lib/server/users';
 import { getApprovalThreshold } from '@/lib/server/settings';
 import { resolveApproverForTask } from '@/lib/server/approverMappings';
 import { getUsersWhoDelegatedToMe } from '@/lib/server/delegations';
+import type { CurrentAppUser } from '@/lib/server/users';
 import { recordAuditEvent } from '@/lib/server/audit';
 import { notifyRole } from '@/lib/server/notifications';
 import { getDocumentUrl } from '@/lib/server/storage';
@@ -23,6 +24,24 @@ export interface WorkflowInstanceWithHistory extends WorkflowInstanceRow {
 async function resolveAssignee(taskId: string, amount: number, fallbackRole: string): Promise<{ assignee_role: string; assignee_id: string | null }> {
   const mapping = await resolveApproverForTask(taskId, amount);
   return mapping ? { assignee_role: mapping.role, assignee_id: mapping.userId } : { assignee_role: fallbackRole, assignee_id: null };
+}
+
+/** Mirrors getApprovalsInbox()'s "mine" filter as an actual authorization
+ * gate, not just an inbox-visibility filter — advanceWorkflowTask() must
+ * reject a caller who isn't Administrator, the task's assignee_id (or their
+ * active out-of-office backup), or holder of its assignee_role, otherwise
+ * any authenticated user could approve/decline/route any invoice regardless
+ * of who it's actually assigned to. */
+async function assertCanActOnTask(currentUser: CurrentAppUser, instance: WorkflowInstanceRow): Promise<void> {
+  if (currentUser.role === 'Administrator') return;
+  if (instance.assignee_id) {
+    if (instance.assignee_id === currentUser.id) return;
+    const delegatedFrom = await getUsersWhoDelegatedToMe(currentUser.id);
+    if (delegatedFrom.includes(instance.assignee_id)) return;
+    throw new Error('This task is not assigned to you.');
+  }
+  if (instance.assignee_role === currentUser.role) return;
+  throw new Error('This task is not assigned to your role.');
 }
 
 /** Starts the Stock or Non-Stock workflow for a newly captured invoice, at
@@ -174,6 +193,8 @@ export async function advanceWorkflowTask(instanceId: string, actionKey: string,
   const { data: instance, error: instErr } = await supabase.from('workflow_instances').select('*').eq('id', instanceId).single()
     .overrideTypes<WorkflowInstanceRow, { merge: false }>();
   if (instErr) throw instErr;
+
+  await assertCanActOnTask(currentUser, instance);
 
   const { data: invoice, error: invErr } = await supabase.from('invoices').select('*').eq('id', instance.invoice_id).single()
     .overrideTypes<InvoiceRow, { merge: false }>();
@@ -372,9 +393,7 @@ export async function getApprovalsInbox(userRole: string, userId: string): Promi
   // backup's inbox too while the primary approver has an active delegation.
   const delegatedFrom = userId === 'guest' ? [] : await getUsersWhoDelegatedToMe(userId);
 
-  // Administrator sees every in-progress task (also the effective behavior
-  // while there's no login and every visitor is the GUEST_USER Administrator
-  // — see src/lib/server/users.ts).
+  // Administrator sees every in-progress task.
   const mine = userRole === 'Administrator' ? instances : instances.filter(i =>
     i.assignee_role === userRole || (i.assignee_id != null && delegatedFrom.includes(i.assignee_id)));
   if (mine.length === 0) return [];

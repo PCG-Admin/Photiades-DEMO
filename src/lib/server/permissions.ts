@@ -3,7 +3,7 @@
 import { redirect } from 'next/navigation';
 import { createServiceClient } from '@/lib/supabase/service';
 import { recordAuditEvent } from '@/lib/server/audit';
-import { getCurrentAppUser } from '@/lib/server/users';
+import { getCurrentAppUser, requireRole } from '@/lib/server/users';
 import type { RolePermissionRow, PortalModule, AppUserRow } from '@/lib/supabase/types';
 
 export async function listRolePermissions(): Promise<RolePermissionRow[]> {
@@ -17,6 +17,7 @@ export async function listRolePermissions(): Promise<RolePermissionRow[]> {
  * seeded data, so toggling this matrix can never lock the admin role itself
  * out of the portal. */
 export async function setRolePermission(role: AppUserRow['role'], module: PortalModule, canAccess: boolean): Promise<void> {
+  await requireRole('Administrator');
   if (role === 'Administrator') return;
   const { error } = await createServiceClient().from('role_permissions')
     .upsert({ role, module, can_access: canAccess } as never, { onConflict: 'role,module' });
@@ -48,5 +49,11 @@ export async function requireModuleAccess(module: PortalModule): Promise<void> {
   const user = await getCurrentAppUser();
   if (user.role === 'Administrator') return;
   const modules = await getAccessibleModules(user.role);
-  if (!modules.has(module)) redirect('/dashboard');
+  if (!modules.has(module)) {
+    await recordAuditEvent({
+      action: `Access denied to "${module}"`, module: 'Auth', target: user.name,
+      icon: 'alert', tone: 'red',
+    });
+    redirect('/dashboard');
+  }
 }

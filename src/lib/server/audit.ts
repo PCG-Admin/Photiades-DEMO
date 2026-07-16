@@ -1,9 +1,21 @@
 'use server';
 
+import { headers } from 'next/headers';
 import { createServiceClient } from '@/lib/supabase/service';
 import { getCurrentAppUser } from '@/lib/server/users';
 import { genCode } from '@/lib/server/codes';
 import type { AuditEventRow, AuditChange } from '@/lib/supabase/types';
+
+/** Best-effort source IP from standard proxy headers — there's no direct
+ * socket access from a Server Action, so this is only as reliable as
+ * whatever's in front of the app (e.g. Vercel/a reverse proxy) setting
+ * x-forwarded-for correctly. Falls back to null rather than throwing. */
+async function requestIp(): Promise<string | null> {
+  const h = await headers();
+  const forwarded = h.get('x-forwarded-for');
+  if (forwarded) return forwarded.split(',')[0].trim();
+  return h.get('x-real-ip');
+}
 
 export interface RecordAuditEventInput {
   action: string;
@@ -32,7 +44,7 @@ export async function recordAuditEvent(input: RecordAuditEventInput): Promise<vo
     tone: input.tone ?? null,
     target: input.target ?? null,
     module: input.module,
-    ip: null,
+    ip: await requestIp(),
     invoice_id: input.invoiceId ?? null,
     changes: input.changes ?? null,
   };

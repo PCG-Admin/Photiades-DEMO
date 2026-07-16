@@ -2,7 +2,7 @@
 
 import { createServiceClient } from '@/lib/supabase/service';
 import { genInvoiceCode } from '@/lib/server/codes';
-import { getCurrentAppUser } from '@/lib/server/users';
+import { requireRole } from '@/lib/server/users';
 import { createWorkflowInstance } from '@/lib/server/workflows';
 import { recordAuditEvent } from '@/lib/server/audit';
 import { uploadInvoiceDocument, getDocumentUrl } from '@/lib/server/storage';
@@ -87,6 +87,7 @@ export async function findDuplicateInvoiceByHash(hash: string): Promise<InvoiceR
  * The audit event for the deletion itself is recorded before the delete so
  * it still names the invoice's code. */
 export async function deleteInvoice(id: string): Promise<void> {
+  await requireRole('AP Manager', 'Administrator');
   const supabase = createServiceClient();
   const { data: invoice, error: fetchError } = await supabase.from('invoices').select('*').eq('id', id).single()
     .overrideTypes<InvoiceRow, { merge: false }>();
@@ -105,6 +106,7 @@ export async function deleteInvoice(id: string): Promise<void> {
  * recordAuditEvent() with the changed fields — SOW §5.7 field-level
  * before/after capture (T150). */
 export async function updateInvoiceFields(id: string, patch: Partial<InvoiceRow>): Promise<InvoiceRow> {
+  await requireRole('AP Clerk', 'AP Manager', 'Administrator', 'Approver');
   const supabase = createServiceClient();
   const { data: before, error: fetchError } = await supabase.from('invoices').select('*').eq('id', id).single()
     .overrideTypes<InvoiceRow, { merge: false }>();
@@ -159,7 +161,7 @@ export interface CaptureStoreInput {
  * and unset both default to the Non-Stock workflow — documented simplification. */
 export async function createInvoiceFromExtraction(input: CaptureStoreInput, file: File | null): Promise<InvoiceRow> {
   const supabase = createServiceClient();
-  const currentUser = await getCurrentAppUser();
+  const currentUser = await requireRole('AP Clerk', 'AP Manager', 'Administrator');
 
   const subtotal = input.lineItems.reduce((s, li) => s + li.amount, 0) || input.amount;
   const total = input.amount || subtotal;

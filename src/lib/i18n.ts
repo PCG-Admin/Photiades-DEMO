@@ -491,6 +491,9 @@ export const TRANSLATIONS: Record<Exclude<Lang, 'en'>, Record<string, string>> =
     'AcMgr-Approval': 'Έγκριση Διευθυντή Λογιστηρίου',
     'AcDep-Approval': 'Έγκριση Λογιστηρίου',
     'Req/ner-Approval': 'Έγκριση Αιτούντος',
+    'AcDep-Check': 'Έλεγχος Λογιστηρίου',
+    'Special Approval': 'Ειδική Έγκριση',
+    'AcDep-PendPmt': 'Λογιστήριο — Εκκρεμής Πληρωμή',
 
     // Roles
     'Purchasing Department': 'Τμήμα Αγορών',
@@ -512,6 +515,10 @@ export const TRANSLATIONS: Record<Exclude<Lang, 'en'>, Record<string, string>> =
     'Request Info': 'Αίτημα Πληροφοριών',
     'Reviewed': 'Ελέγχθηκε',
     'Pend. Pmt': 'Εκκρ. Πληρωμή',
+    'Send to AcMgr': 'Αποστολή στον Διευθυντή Λογιστηρίου',
+    'Send to Req/ner': 'Αποστολή στον Αιτούντα',
+    'Sent to AcMgr': 'Στάλθηκε στον Διευθυντή Λογιστηρίου',
+    'Decline': 'Απόρριψη',
 
     // Field labels
     'Comment when stored': 'Σχόλιο κατά την αποθήκευση',
@@ -537,12 +544,18 @@ export const TRANSLATIONS: Record<Exclude<Lang, 'en'>, Record<string, string>> =
     'Accounts Department final approval — confirm document numbers before releasing for payment.':
       'Τελική έγκριση Λογιστηρίου — επιβεβαίωση αριθμών εγγράφων πριν την απελευθέρωση για πληρωμή.',
     'Special Invoice Workflow': 'Ροή Ειδικού Τιμολογίου',
-    'Accounts Department reviews the special invoice and routes it for approval.':
-      'Το Λογιστήριο ελέγχει το ειδικό τιμολόγιο και το δρομολογεί για έγκριση.',
-    'The requisitioner reviews and approves the special invoice.':
-      'Ο αιτών ελέγχει και εγκρίνει το ειδικό τιμολόγιο.',
-    'Accounts Manager approval for the special invoice.':
-      'Έγκριση Διευθυντή Λογιστηρίου για το ειδικό τιμολόγιο.',
+    'Accounts Department reviews the special invoice and routes it to the requisitioner or straight to the Accounts Manager.':
+      'Το Λογιστήριο ελέγχει το ειδικό τιμολόγιο και το δρομολογεί στον αιτούντα ή απευθείας στον Διευθυντή Λογιστηρίου.',
+    'The requisitioner reviews the special invoice and sends it on to the Accounts Manager, or hands it to a different requisitioner.':
+      'Ο αιτών ελέγχει το ειδικό τιμολόγιο και το προωθεί στον Διευθυντή Λογιστηρίου, ή το αναθέτει σε άλλον αιτούντα.',
+    'Accounts Manager approval for the special invoice — approve to send to Accounts Department, or route to a special approver.':
+      'Έγκριση Διευθυντή Λογιστηρίου για το ειδικό τιμολόγιο — έγκριση για αποστολή στο Λογιστήριο, ή δρομολόγηση σε ειδικό εγκριτή.',
+    'The specially selected approver reviews the invoice before it returns to Accounts Department.':
+      'Ο ειδικά επιλεγμένος εγκριτής ελέγχει το τιμολόγιο πριν αυτό επιστρέψει στο Λογιστήριο.',
+    'Accounts Department final approval — mark paid, hold for the next payment run, or send back for more information.':
+      'Τελική έγκριση Λογιστηρίου — σήμανση ως εξοφλημένο, αναμονή για την επόμενη πληρωμή, ή επιστροφή για περισσότερες πληροφορίες.',
+    'Held pending payment — mark paid once released, or decline.':
+      'Σε αναμονή πληρωμής — σήμανση ως εξοφλημένο μόλις εκδοθεί, ή απόρριψη.',
     'Verify the imported non-stock invoice and confirm where it should be routed for approval.':
       'Επιβεβαιώστε το εισαγόμενο τιμολόγιο μη-αποθέματος και πού πρέπει να δρομολογηθεί για έγκριση.',
     'The requisitioner reviews and approves the non-stock invoice.':

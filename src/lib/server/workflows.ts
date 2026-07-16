@@ -225,6 +225,11 @@ export async function advanceWorkflowTask(instanceId: string, actionKey: string,
       if (fields.po !== undefined) invoicePatch.po = fields.po ? String(fields.po) : null;
       if (fields.amount) invoicePatch.total = Number(fields.amount) || invoice.total;
     }
+    // Doc numbers are captured on whichever outcome carries them (Stock/
+    // Non-Stock's final approval and pending-payment steps, Special
+    // Invoice's several) — applied generically rather than per-case.
+    if (fields.stkDoc) invoicePatch.stock_doc_number = String(fields.stkDoc);
+    if (fields.nonStkDoc) invoicePatch.non_stock_doc_number = String(fields.nonStkDoc);
 
     switch (action.key) {
       case 'declined':
@@ -238,17 +243,36 @@ export async function advanceWorkflowTask(instanceId: string, actionKey: string,
       case 'pendPmt':
         instancePatch = { status: 'Pending Payment' };
         invoicePatch.status = 'Pending Payment';
-        if (fields.stkDoc) invoicePatch.stock_doc_number = String(fields.stkDoc);
-        if (fields.nonStkDoc) invoicePatch.non_stock_doc_number = String(fields.nonStkDoc);
         break;
+      case 'paidDirect':
+        // Special Invoice's AcDep-Approval "Paid" — completes the workflow
+        // immediately, bypassing the AcDep-PendPmt holding task entirely.
+        instancePatch = { status: 'Completed' };
+        invoicePatch.status = 'Approved';
+        break;
+      case 'reassignReqner': {
+        // Special Invoice's Req/ner-Approval "Send to Req/ner" — reassigns
+        // to a different requisitioner without moving off this task or
+        // pausing for a separate grant/decline step (unlike 'additional').
+        const approver = await findAppUserByName(String(fields.approver || ''));
+        instancePatch = { assignee_id: approver?.id ?? null };
+        break;
+      }
       case 'requestInfo': {
         // Sends the task back to whoever handled the immediately preceding
-        // human task (skipping auto/branch routing steps like Amount
-        // Check) — that's whoever actually owns the data being questioned.
-        // Once they fix it and act again, the normal forward transition
-        // below carries it right back to this task.
-        let prevIdx = instance.task_idx - 1;
-        while (prevIdx > 0 && tasks[prevIdx].auto) prevIdx--;
+        // human task. For a strictly linear chain that's just the previous
+        // array index (skipping auto/branch routing steps like Amount
+        // Check) — but a branching chain like Special Invoice's needs an
+        // explicit toTaskId, since the previous array slot may be a side
+        // task (e.g. Special Approval) rather than the real prior step.
+        let prevIdx: number;
+        if (action.toTaskId) {
+          prevIdx = tasks.findIndex(t => t.id === action.toTaskId);
+          if (prevIdx === -1) throw new Error(`Unknown target task "${action.toTaskId}".`);
+        } else {
+          prevIdx = instance.task_idx - 1;
+          while (prevIdx > 0 && tasks[prevIdx].auto) prevIdx--;
+        }
         instancePatch = { task_idx: prevIdx, status: 'Info Requested', ...(await resolveAssignee(tasks[prevIdx].id, invoice.total, tasks[prevIdx].role)) };
         break;
       }
@@ -258,14 +282,27 @@ export async function advanceWorkflowTask(instanceId: string, actionKey: string,
         break;
       }
       default: {
-        // forward transitions: approved / reviewed
         const amount = invoicePatch.total ?? invoice.total;
-        const nextIdx = instance.task_idx + 1;
-        if (nextIdx >= tasks.length) {
-          instancePatch = { status: 'Completed' };
-          invoicePatch.status = 'Approved';
+        if (action.toTaskId) {
+          // Explicit branch/detour jump (a manual routing choice, or a side
+          // task like Special Approval) rather than the next array index.
+          const idx = tasks.findIndex(t => t.id === action.toTaskId);
+          if (idx === -1) throw new Error(`Unknown target task "${action.toTaskId}".`);
+          const assignee = await resolveAssignee(tasks[idx].id, amount, tasks[idx].role);
+          if (fields.approver) {
+            const approver = await findAppUserByName(String(fields.approver));
+            if (approver) assignee.assignee_id = approver.id;
+          }
+          instancePatch = { task_idx: idx, status: 'In Progress', ...assignee };
         } else {
-          instancePatch = { task_idx: nextIdx, status: 'In Progress', ...(await resolveAssignee(tasks[nextIdx].id, amount, tasks[nextIdx].role)) };
+          // forward transitions: approved / reviewed
+          const nextIdx = instance.task_idx + 1;
+          if (nextIdx >= tasks.length) {
+            instancePatch = { status: 'Completed' };
+            invoicePatch.status = 'Approved';
+          } else {
+            instancePatch = { task_idx: nextIdx, status: 'In Progress', ...(await resolveAssignee(tasks[nextIdx].id, amount, tasks[nextIdx].role)) };
+          }
         }
       }
     }

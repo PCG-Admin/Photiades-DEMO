@@ -43,10 +43,10 @@ export interface ExtractedInvoice {
 const RESPONSE_SCHEMA = {
   type: Type.OBJECT,
   properties: {
-    vendor: { type: Type.STRING, description: 'Supplier / vendor name' },
+    vendor: { type: Type.STRING, description: "Supplier / vendor name — the company issuing/sending the invoice (its own letterhead, logo, or 'From' details), never the bill-to/customer the invoice is addressed to." },
     invoiceNo: { type: Type.STRING },
-    date: { type: Type.STRING, nullable: true, description: 'Invoice date, ISO 8601 yyyy-mm-dd' },
-    dueDate: { type: Type.STRING, nullable: true, description: 'Payment due date, ISO 8601 yyyy-mm-dd' },
+    date: { type: Type.STRING, nullable: true, description: 'Invoice date, ISO 8601 yyyy-mm-dd. The source document uses day-first (DD/MM/YYYY) numeric dates, not US month-first (MM/DD/YYYY) — e.g. 09/01/2026 on the document means 9 January 2026, not September 1st.' },
+    dueDate: { type: Type.STRING, nullable: true, description: 'Payment due date, ISO 8601 yyyy-mm-dd. Same day-first (DD/MM/YYYY) source format as the invoice date.' },
     po: { type: Type.STRING, nullable: true, description: 'Purchase order number, if referenced on the document' },
     companyCode: { type: Type.STRING, nullable: true },
     vendorRef: { type: Type.STRING, nullable: true, description: "Vendor's own reference / customer number" },
@@ -100,6 +100,16 @@ document, return null for it rather than guessing a value. For "stockType", only
 document clearly indicates physical goods (Stock) vs. services/expenses (Non-stock) — otherwise
 return null. Report all monetary amounts as plain numbers (no currency symbols, no thousands
 separators).
+
+Vendor vs. bill-to: the "vendor" is whoever is ISSUING and sending this invoice — their own
+letterhead, logo, or company details, usually at the top of the page. It is never the "Bill To" /
+"Customer" / "To" party the invoice is addressed to, even if that section is more prominent or
+appears first in reading order.
+
+Date format: all dates on these source documents — printed or handwritten — are day-first
+(DD/MM/YYYY), the convention used in Cyprus/Europe, not the US month-first (MM/DD/YYYY) convention.
+A numeric date like 09/01/2026 means 9 January 2026, not September 1st. Convert every date to
+yyyy-mm-dd using this day-first reading, including handwritten dates.
 
 Also return "boxes": for each of vendor, invoiceNo, date, dueDate, po, companyCode, vendorRef, and
 total, locate exactly where that value is printed on the page and report its bounding box using the

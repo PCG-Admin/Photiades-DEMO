@@ -16,6 +16,11 @@ export interface WFAction {
   tone: string;
   icon: string;
   fields: WFField[];
+  // Explicit "jump to this task" target — for outcomes that don't simply
+  // advance to the next array index (a branch choice, a side-task detour,
+  // or a Request Info that needs to skip a side-task and land on the real
+  // previous step). See advanceWorkflowTask's toTaskId handling.
+  toTaskId?: string;
 }
 export interface WFBranch {
   threshold: number;
@@ -357,71 +362,137 @@ export const WF_NONSTOCK_TASKS: WFTask[] = [
 // collected at Capture time itself, so unlike Stock/Non-Stock this chain
 // has no separate AP Clerk "imported" task — it starts directly with
 // Accounts Department review.
+//
+// This is a genuine branching graph, not a straight line — AcDep-Check can
+// send the invoice to either Req/ner-Approval or straight to AcMgr-Approval,
+// and AcMgr-Approval can detour through a Special Approval side task before
+// continuing. Every non-adjacent jump uses an explicit `toTaskId` (see
+// WFAction) rather than relying on array-position math, since that math
+// only holds for a strictly linear chain like Stock/Non-Stock.
+//
+// "Com when stored" showed up as a read-only field on Req/ner-Approval,
+// AcMgr-Approval, and Special Approval in the source spec — recalling a
+// specific *other* task's stored comment isn't something the engine can
+// currently do (WFField's `ro` type only reads live invoice fields like
+// amount/po, not another task's history), so those were left out rather
+// than shown as a misleadingly-blank read-only box. Flagged for follow-up
+// if that recall is actually needed.
 export const WF_SPECIAL_TASKS: WFTask[] = [
   {
-    id: 'sp1', name: 'AcDep-Approval', role: 'Accounts Department', stage: 'Approval',
-    desc: 'Accounts Department reviews the special invoice and routes it for approval.',
+    id: 'sp1', name: 'AcDep-Check', role: 'Accounts Department', stage: 'Review',
+    desc: 'Accounts Department reviews the special invoice and routes it to the requisitioner or straight to the Accounts Manager.',
     actions: [
-      { key: 'approved', label: 'Approved', tone: 'green', icon: 'check',
+      { key: 'sendToAcMgr', label: 'Send to AcMgr', tone: 'blue', icon: 'arrowR', toTaskId: 'sp3',
         fields: [
           { k: 'invNo', label: 'Invoice Number', type: 'ro', src: 'invNo' },
           { k: 'po', label: 'PO Number', type: 'ro', src: 'po' },
           { k: 'amount', label: 'Amount', type: 'ro-currency', src: 'amount' },
+          { k: 'nonStkDoc', label: 'Non-Stock Document Number', type: 'text' },
+          { k: 'comStored', label: 'Comment when stored', type: 'textarea' },
           { k: 'com', label: 'Comment', type: 'textarea' },
         ] },
-      { key: 'requestInfo', label: 'Request Info', tone: 'amber', icon: 'refresh',
-        fields: [{ k: 'com', label: 'Comment', type: 'textarea', required: true }] },
+      { key: 'sendToReqner', label: 'Send to Req/ner', tone: 'blue', icon: 'arrowR', toTaskId: 'sp2',
+        fields: [
+          { k: 'invNo', label: 'Invoice Number', type: 'ro', src: 'invNo' },
+          { k: 'po', label: 'PO Number', type: 'ro', src: 'po' },
+          { k: 'amount', label: 'Amount', type: 'ro-currency', src: 'amount' },
+          { k: 'nonStkDoc', label: 'Non-Stock Document Number', type: 'text' },
+          { k: 'comStored', label: 'Comment when stored', type: 'textarea' },
+          { k: 'com', label: 'Comment', type: 'textarea' },
+        ] },
+      { key: 'sendPendPmt', label: 'Pend. Pmt', tone: 'teal', icon: 'clock', toTaskId: 'sp5',
+        fields: [
+          { k: 'invNo', label: 'Invoice Number', type: 'ro', src: 'invNo' },
+          { k: 'po', label: 'PO Number', type: 'ro', src: 'po' },
+          { k: 'amount', label: 'Amount', type: 'ro-currency', src: 'amount' },
+          { k: 'nonStkDoc', label: 'Non-Stock Document Number', type: 'text' },
+          { k: 'comStored', label: 'Comment when stored', type: 'textarea' },
+          { k: 'com', label: 'Comment', type: 'textarea' },
+        ] },
       { key: 'declined', label: 'Declined', tone: 'red', icon: 'x',
         fields: [{ k: 'com', label: 'Comment', type: 'textarea', required: true }] },
     ],
   },
   {
     id: 'sp2', name: 'Req/ner-Approval', role: 'Requisitioner', stage: 'Approval',
-    desc: 'The requisitioner reviews and approves the special invoice.',
+    desc: 'The requisitioner reviews the special invoice and sends it on to the Accounts Manager, or hands it to a different requisitioner.',
     actions: [
-      { key: 'approved', label: 'Approved', tone: 'green', icon: 'check',
+      { key: 'sentToAcMgr', label: 'Sent to AcMgr', tone: 'green', icon: 'arrowR', toTaskId: 'sp3',
         fields: [
           { k: 'invNo', label: 'Invoice Number', type: 'ro', src: 'invNo' },
           { k: 'po', label: 'PO Number', type: 'ro', src: 'po' },
           { k: 'amount', label: 'Amount', type: 'ro-currency', src: 'amount' },
           { k: 'com', label: 'Comment', type: 'textarea' },
         ] },
-      { key: 'requestInfo', label: 'Request Info', tone: 'amber', icon: 'refresh',
-        fields: [{ k: 'com', label: 'Comment', type: 'textarea', required: true }] },
+      { key: 'reassignReqner', label: 'Send to Req/ner', tone: 'violet', icon: 'users',
+        fields: [
+          { k: 'approver', label: 'Send to Req/ner', type: 'select', options: [], required: true },
+          { k: 'invNo', label: 'Invoice Number', type: 'ro', src: 'invNo' },
+          { k: 'po', label: 'PO Number', type: 'ro', src: 'po' },
+          { k: 'amount', label: 'Amount', type: 'ro-currency', src: 'amount' },
+          { k: 'com', label: 'Comment', type: 'textarea' },
+        ] },
       { key: 'declined', label: 'Declined', tone: 'red', icon: 'x',
         fields: [{ k: 'com', label: 'Comment', type: 'textarea', required: true }] },
     ],
   },
   {
     id: 'sp3', name: 'AcMgr-Approval', role: 'Accounts Manager', stage: 'Approval',
-    desc: 'Accounts Manager approval for the special invoice.',
+    desc: 'Accounts Manager approval for the special invoice — approve to send to Accounts Department, or route to a special approver.',
     actions: [
-      { key: 'additional', label: 'Additional Approval', tone: 'violet', icon: 'users',
+      { key: 'specialApproval', label: 'Additional Approval', tone: 'violet', icon: 'users', toTaskId: 'sp3a',
         fields: [
-          { k: 'invNo', label: 'Invoice Number', type: 'ro', src: 'invNo' },
-          { k: 'po', label: 'PO Number', type: 'ro', src: 'po' },
-          { k: 'amount', label: 'Amount', type: 'ro-currency', src: 'amount' },
           { k: 'approver', label: 'Select user to approve', type: 'select', options: [], required: true },
+          { k: 'invNo', label: 'Invoice Number', type: 'ro', src: 'invNo' },
+          { k: 'po', label: 'PO Number', type: 'ro', src: 'po' },
+          { k: 'amount', label: 'Amount', type: 'ro-currency', src: 'amount' },
           { k: 'com', label: 'Comment', type: 'textarea' },
         ] },
-      { key: 'approved', label: 'Approved', tone: 'green', icon: 'check',
+      { key: 'approved', label: 'Approve', tone: 'green', icon: 'check', toTaskId: 'sp4',
         fields: [
           { k: 'invNo', label: 'Invoice Number', type: 'ro', src: 'invNo' },
           { k: 'po', label: 'PO Number', type: 'ro', src: 'po' },
           { k: 'amount', label: 'Amount', type: 'ro-currency', src: 'amount' },
           { k: 'com', label: 'Comment', type: 'textarea' },
         ] },
-      { key: 'requestInfo', label: 'Request Info', tone: 'amber', icon: 'refresh',
+      { key: 'requestInfo', label: 'Request Info', tone: 'amber', icon: 'refresh', toTaskId: 'sp2',
+        fields: [
+          { k: 'invNo', label: 'Invoice Number', type: 'ro', src: 'invNo' },
+          { k: 'po', label: 'PO Number', type: 'ro', src: 'po' },
+          { k: 'amount', label: 'Amount', type: 'ro-currency', src: 'amount' },
+          { k: 'com', label: 'Comment', type: 'textarea', required: true },
+        ] },
+      { key: 'declined', label: 'Decline', tone: 'red', icon: 'x',
         fields: [{ k: 'com', label: 'Comment', type: 'textarea', required: true }] },
-      { key: 'declined', label: 'Declined', tone: 'red', icon: 'x',
+    ],
+  },
+  {
+    id: 'sp3a', name: 'Special Approval', role: 'Accounts Manager', stage: 'Approval',
+    desc: 'The specially selected approver reviews the invoice before it returns to Accounts Department.',
+    actions: [
+      { key: 'approved', label: 'Approve', tone: 'green', icon: 'check', toTaskId: 'sp4',
+        fields: [
+          { k: 'invNo', label: 'Invoice Number', type: 'ro', src: 'invNo' },
+          { k: 'po', label: 'PO Number', type: 'ro', src: 'po' },
+          { k: 'amount', label: 'Amount', type: 'ro-currency', src: 'amount' },
+          { k: 'com', label: 'Comment', type: 'textarea' },
+        ] },
+      { key: 'requestInfo', label: 'Request Info', tone: 'amber', icon: 'refresh', toTaskId: 'sp2',
+        fields: [
+          { k: 'invNo', label: 'Invoice Number', type: 'ro', src: 'invNo' },
+          { k: 'po', label: 'PO Number', type: 'ro', src: 'po' },
+          { k: 'amount', label: 'Amount', type: 'ro-currency', src: 'amount' },
+          { k: 'com', label: 'Comment', type: 'textarea', required: true },
+        ] },
+      { key: 'declined', label: 'Decline', tone: 'red', icon: 'x',
         fields: [{ k: 'com', label: 'Comment', type: 'textarea', required: true }] },
     ],
   },
   {
     id: 'sp4', name: 'AcDep-Approval', role: 'Accounts Department', stage: 'Approval',
-    desc: 'Accounts Department final approval — confirm document numbers before releasing for payment.',
+    desc: 'Accounts Department final approval — mark paid, hold for the next payment run, or send back for more information.',
     actions: [
-      { key: 'approved', label: 'Approved', tone: 'green', icon: 'check',
+      { key: 'paidDirect', label: 'Paid', tone: 'green', icon: 'check',
         fields: [
           { k: 'invNo', label: 'Invoice Number', type: 'ro', src: 'invNo' },
           { k: 'po', label: 'PO Number', type: 'ro', src: 'po' },
@@ -430,11 +501,30 @@ export const WF_SPECIAL_TASKS: WFTask[] = [
           { k: 'nonStkDoc', label: 'Non-Stock Document Number', type: 'text' },
           { k: 'com', label: 'Comment', type: 'textarea' },
         ] },
-      { key: 'requestInfo', label: 'Request Info', tone: 'amber', icon: 'refresh',
+      { key: 'requestInfo', label: 'Request Info', tone: 'amber', icon: 'refresh', toTaskId: 'sp3',
+        fields: [
+          { k: 'invNo', label: 'Invoice Number', type: 'ro', src: 'invNo' },
+          { k: 'po', label: 'PO Number', type: 'ro', src: 'po' },
+          { k: 'amount', label: 'Amount', type: 'ro-currency', src: 'amount' },
+          { k: 'com', label: 'Comment', type: 'textarea', required: true },
+        ] },
+      { key: 'sendPendPmt', label: 'Pend. Pmt', tone: 'teal', icon: 'clock', toTaskId: 'sp5',
+        fields: [
+          { k: 'invNo', label: 'Invoice Number', type: 'ro', src: 'invNo' },
+          { k: 'po', label: 'PO Number', type: 'ro', src: 'po' },
+          { k: 'amount', label: 'Amount', type: 'ro-currency', src: 'amount' },
+          { k: 'nonStkDoc', label: 'Non-Stock Document Number', type: 'text' },
+          { k: 'com', label: 'Comment', type: 'textarea' },
+        ] },
+      { key: 'declined', label: 'Decline', tone: 'red', icon: 'x',
         fields: [{ k: 'com', label: 'Comment', type: 'textarea', required: true }] },
-      { key: 'declined', label: 'Declined', tone: 'red', icon: 'x',
-        fields: [{ k: 'com', label: 'Comment', type: 'textarea', required: true }] },
-      { key: 'pendPmt', label: 'Pend. Pmt', tone: 'teal', icon: 'clock',
+    ],
+  },
+  {
+    id: 'sp5', name: 'AcDep-PendPmt', role: 'Accounts Department', stage: 'Approval',
+    desc: 'Held pending payment — mark paid once released, or decline.',
+    actions: [
+      { key: 'paid', label: 'Paid', tone: 'green', icon: 'check',
         fields: [
           { k: 'invNo', label: 'Invoice Number', type: 'ro', src: 'invNo' },
           { k: 'po', label: 'PO Number', type: 'ro', src: 'po' },
@@ -443,6 +533,8 @@ export const WF_SPECIAL_TASKS: WFTask[] = [
           { k: 'nonStkDoc', label: 'Non-Stock Document Number', type: 'text' },
           { k: 'com', label: 'Comment', type: 'textarea' },
         ] },
+      { key: 'declined', label: 'Decline', tone: 'red', icon: 'x',
+        fields: [{ k: 'com', label: 'Comment', type: 'textarea', required: true }] },
     ],
   },
 ];

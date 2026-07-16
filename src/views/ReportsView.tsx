@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useId, useMemo, useState } from 'react';
 import { I, type IconComponent } from '@/components/icons';
 import { Badge, MiniStat, PageHeader, Pagination, usePagination } from '@/components/ui';
 import { fmtMoney, cx } from '@/lib/utils';
@@ -94,16 +94,74 @@ export function ExportButtons({ data, filename }: { data: Record<string, unknown
 function RankedBars({ items }: { items: { label: string; value: number; displayValue: string; color: string }[] }) {
   const max = Math.max(...items.map(i => i.value), 1);
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 11 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 11, background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 10, padding: 18 }}>
       {items.map(item => (
         <div key={item.label} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <div style={{ width: 168, fontSize: 12.5, color: 'var(--text-2)', flexShrink: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={item.label}>{item.label}</div>
-          <div style={{ flex: 1, height: 20, background: 'var(--surface-2)', borderRadius: 5, position: 'relative', overflow: 'hidden' }}>
+          <div style={{ flex: 1, height: 20, background: 'var(--surface)', borderRadius: 5, position: 'relative', overflow: 'hidden', border: '1px solid var(--border)' }}>
             <div style={{ position: 'absolute', inset: 0, width: `${Math.max(2, (item.value / max) * 100)}%`, background: item.color, borderRadius: 5, transition: 'width .5s cubic-bezier(.22,1,.36,1)' }} />
           </div>
           <div className="mono" style={{ width: 76, textAlign: 'right', fontSize: 12.5, fontWeight: 600, flexShrink: 0 }}>{item.displayValue}</div>
         </div>
       ))}
+    </div>
+  );
+}
+
+/** Hand-rolled SVG line chart (no charting dependency in this codebase) —
+ * a grey panel with gridlines, a gradient-filled area under a smooth line,
+ * and per-point hover tooltips (native <title>, so no extra JS state).
+ * Used wherever a report has a genuine time series (declines over time),
+ * not the point-in-time aggregates the bar reports show. */
+function TrendLineChart({ points, color = 'var(--accent)', valueFmt = (v: number) => String(v) }: {
+  points: { label: string; value: number; detail?: string }[];
+  color?: string;
+  valueFmt?: (v: number) => string;
+}) {
+  const gradId = useId().replace(/[:]/g, '');
+  const W = 760, H = 220, PAD_L = 10, PAD_R = 10, PAD_T = 20, PAD_B = 30;
+  const innerW = W - PAD_L - PAD_R;
+  const innerH = H - PAD_T - PAD_B;
+  const max = Math.max(...points.map(p => p.value), 1);
+  const stepX = points.length > 1 ? innerW / (points.length - 1) : 0;
+  const coords = points.map((p, i) => ({
+    ...p,
+    x: PAD_L + i * stepX,
+    y: PAD_T + innerH - (p.value / max) * innerH,
+  }));
+  const linePath = coords.map((c, i) => `${i === 0 ? 'M' : 'L'} ${c.x.toFixed(1)} ${c.y.toFixed(1)}`).join(' ');
+  const baseline = PAD_T + innerH;
+  const areaPath = coords.length > 0
+    ? `${linePath} L ${coords[coords.length - 1].x.toFixed(1)} ${baseline} L ${coords[0].x.toFixed(1)} ${baseline} Z`
+    : '';
+  const gridFracs = [0, 0.25, 0.5, 0.75, 1];
+  const labelEvery = Math.max(1, Math.ceil(coords.length / 7));
+
+  return (
+    <div style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 10, padding: '18px 18px 8px' }}>
+      <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: 'auto', display: 'block', overflow: 'visible' }}>
+        <defs>
+          <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={color} stopOpacity="0.28" />
+            <stop offset="100%" stopColor={color} stopOpacity="0" />
+          </linearGradient>
+        </defs>
+        {gridFracs.map(f => {
+          const y = PAD_T + innerH * f;
+          return <line key={f} x1={PAD_L} x2={W - PAD_R} y1={y} y2={y} stroke="var(--border)" strokeWidth={1} />;
+        })}
+        <text x={PAD_L} y={PAD_T - 6} fontSize="11" fill="var(--muted)" fontFamily="var(--mono)">{valueFmt(max)}</text>
+        {areaPath && <path d={areaPath} fill={`url(#${gradId})`} />}
+        {linePath && <path d={linePath} fill="none" stroke={color} strokeWidth={2.25} strokeLinejoin="round" strokeLinecap="round" />}
+        {coords.map((c, i) => (
+          <circle key={i} cx={c.x} cy={c.y} r={3.5} fill="var(--surface)" stroke={color} strokeWidth={2}>
+            <title>{c.label}{c.detail ? ` — ${c.detail}` : ''} — {valueFmt(c.value)}</title>
+          </circle>
+        ))}
+        {coords.filter((_, i) => i % labelEvery === 0 || i === coords.length - 1).map((c, i) => (
+          <text key={i} x={c.x} y={H - 8} fontSize="10.5" fill="var(--muted)" textAnchor={i === 0 ? 'start' : 'middle'}>{c.label}</text>
+        ))}
+      </svg>
     </div>
   );
 }
@@ -241,6 +299,28 @@ function DeclinedInvoicesReport() {
   const totalValue = data?.reduce((s, r) => s + r.amount, 0) ?? 0;
   const { page, setPage, totalPages, pageItems, total: totalRows, pageSize } = usePagination(data ?? []);
 
+  // Buckets declines into calendar weeks (Mon–Sun) so the trend line stays
+  // readable regardless of how much history is in `data` — last 12 weeks
+  // that actually contain a decline, oldest first.
+  const weeklyTrend = useMemo(() => {
+    if (!data || data.length === 0) return [];
+    const byWeek = new Map<string, { weekStart: Date; count: number; amount: number }>();
+    for (const r of data) {
+      const d = new Date(r.when);
+      const sinceMonday = (d.getDay() + 6) % 7;
+      const weekStart = new Date(d.getFullYear(), d.getMonth(), d.getDate() - sinceMonday);
+      const key = weekStart.toISOString().slice(0, 10);
+      const entry = byWeek.get(key) ?? { weekStart, count: 0, amount: 0 };
+      entry.count += 1;
+      entry.amount += r.amount;
+      byWeek.set(key, entry);
+    }
+    return Array.from(byWeek.values())
+      .sort((a, b) => a.weekStart.getTime() - b.weekStart.getTime())
+      .slice(-12)
+      .map(w => ({ label: fmtDate(w.weekStart), value: w.count, detail: fmtMoney(w.amount) }));
+  }, [data]);
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--gap-5)' }}>
       {data && data.length > 0 && (
@@ -254,6 +334,12 @@ function DeclinedInvoicesReport() {
         {data && (
           data.length === 0 ? <div className="faint" style={{ fontSize: 13 }}>{tr('No declined invoices yet.')}</div> : (
             <>
+              {weeklyTrend.length > 1 && (
+                <div style={{ marginBottom: 22 }}>
+                  <div style={{ fontSize: 12, fontWeight: 600, letterSpacing: '0.04em', textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 11 }}>{tr('Declines per week')}</div>
+                  <TrendLineChart points={weeklyTrend} color="var(--red)" valueFmt={(v) => String(Math.round(v))} />
+                </div>
+              )}
               <table className="tbl">
                 <thead><tr><th>{tr('Invoice')}</th><th>{tr('Vendor')}</th><th className="right">{tr('Amount')}</th><th>{tr('Task')}</th><th>{tr('Reason')}</th><th>{tr('When')}</th></tr></thead>
                 <tbody>

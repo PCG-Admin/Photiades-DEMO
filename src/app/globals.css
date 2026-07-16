@@ -58,11 +58,14 @@
   --sidebar-w: 248px;
   --topbar-h: 60px;
 
-  /* Aperture type system: Inter carries every interface role, IBM Plex Mono
-     is reserved for anything measured (currency, IDs, timestamps) so digits
-     stay tabular and read as data, not prose. */
+  /* Inter carries every interface role. Figures (currency, IDs, timestamps)
+     use Aptos instead, per the user's preference — falls back to Segoe UI
+     where Aptos isn't installed (it ships with Windows 11 / Microsoft 365,
+     not via Google Fonts). Tabular-figure alignment for numeric columns is
+     handled by font-variant-numeric: tabular-nums (.tnum, .tbl .num), not by
+     a monospaced typeface. */
   --font: var(--font-inter), 'Inter', system-ui, -apple-system, sans-serif;
-  --mono: var(--font-plex-mono), 'IBM Plex Mono', ui-monospace, monospace;
+  --mono: 'Aptos', 'Segoe UI', var(--font-inter), system-ui, -apple-system, sans-serif;
 }
 
 [data-theme="dark"] {

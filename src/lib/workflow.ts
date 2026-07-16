@@ -555,5 +555,5 @@ export const wfById = (id: string) => WORKFLOWS.find(w => w.id === id) || WORKFL
 export const ASSIGNABLE_TASKS: { id: string; name: string; workflowShort: string; defaultRole: string }[] = WORKFLOWS.flatMap(wf =>
   wf.tasks.filter(t => !t.auto).map(t => ({ id: t.id, name: t.name, workflowShort: wf.short, defaultRole: t.role })));
 
-export const ACTION_TONE_VAR = (t: string) => (({ green: 'var(--green)', red: 'var(--red)', amber: 'var(--amber)', violet: 'var(--violet)', teal: 'var(--teal)', gray: 'var(--muted)' } as Record<string, string>)[t]);
-export const ACTION_SOFT_VAR = (t: string) => (({ green: 'var(--green-soft)', red: 'var(--red-soft)', amber: 'var(--amber-soft)', violet: 'var(--violet-soft)', teal: 'var(--teal-soft)', gray: 'var(--surface-3)' } as Record<string, string>)[t]);
+export const ACTION_TONE_VAR = (t: string) => (({ green: 'var(--green)', red: 'var(--red)', amber: 'var(--amber)', violet: 'var(--violet)', teal: 'var(--teal)', blue: 'var(--accent)', gray: 'var(--muted)' } as Record<string, string>)[t] ?? 'var(--muted)');
+export const ACTION_SOFT_VAR = (t: string) => (({ green: 'var(--green-soft)', red: 'var(--red-soft)', amber: 'var(--amber-soft)', violet: 'var(--violet-soft)', teal: 'var(--teal-soft)', blue: 'var(--accent-soft)', gray: 'var(--surface-3)' } as Record<string, string>)[t] ?? 'var(--surface-3)');

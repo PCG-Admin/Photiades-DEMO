@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from 'next';
-import { Inter, IBM_Plex_Mono } from 'next/font/google';
+import { Inter } from 'next/font/google';
 import Script from 'next/script';
 import './globals.css';
 import { ThemeProvider } from '@/components/providers/ThemeProvider';
@@ -9,13 +9,6 @@ const inter = Inter({
   subsets: ['latin'],
   weight: ['400', '500', '600', '700'],
   variable: '--font-inter',
-  display: 'swap',
-});
-
-const plexMono = IBM_Plex_Mono({
-  subsets: ['latin'],
-  weight: ['400', '500', '600'],
-  variable: '--font-plex-mono',
   display: 'swap',
 });
 
@@ -34,7 +27,7 @@ const themeScript = `(function(){try{var s=localStorage.getItem('photiades-theme
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" data-theme="light" suppressHydrationWarning className={`${inter.variable} ${plexMono.variable}`}>
+    <html lang="en" data-theme="light" suppressHydrationWarning className={inter.variable}>
       <body>
         <Script id="theme-init" strategy="beforeInteractive">{themeScript}</Script>
         <ThemeProvider>

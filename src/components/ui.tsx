@@ -295,11 +295,14 @@ export function Pagination({ page, totalPages, onChange, total, pageSize }: {
   );
 }
 
-export function Toast({ msg, icon }: { msg: string; icon?: IconComponent }) {
-  const Ico = icon || I.check;
+export function Toast({ msg, icon, tone = 'default' }: { msg: string; icon?: IconComponent; tone?: 'default' | 'error' }) {
+  const Ico = icon || (tone === 'error' ? I.alert : I.check);
   return (
     <div className="toast-wrap">
-      <div className="toast"><Ico size={16} />{msg}</div>
+      <div className={cx('toast', tone)}>
+        <span className="toast-icon"><Ico size={15} /></span>
+        {msg}
+      </div>
     </div>
   );
 }

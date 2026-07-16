@@ -552,10 +552,19 @@ input, select, textarea { font-family: inherit; }
 .toast-wrap { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); z-index: 80; display: flex; flex-direction: column; gap: 8px; align-items: center; }
 .toast {
   background: var(--text); color: var(--bg);
-  padding: 11px 18px; border-radius: 99px; font-size: 13px; font-weight: 500;
+  padding: 9px 18px 9px 9px; border-radius: 99px; font-size: 13px; font-weight: 500;
   box-shadow: var(--shadow-lg); display: flex; align-items: center; gap: 10px;
   animation: fadeUp 0.25s cubic-bezier(0.22,1,0.36,1);
+  max-width: 460px;
 }
+.toast-icon {
+  width: 26px; height: 26px; border-radius: 99px; flex-shrink: 0;
+  display: grid; place-items: center;
+  background: color-mix(in oklch, var(--bg), transparent 78%);
+  color: var(--bg);
+}
+.toast.error { background: var(--red); color: white; }
+.toast.error .toast-icon { background: color-mix(in oklch, white, transparent 72%); color: white; }
 
 /* empty state */
 .empty { text-align: center; padding: 60px 20px; color: var(--muted); }

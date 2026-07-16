@@ -3,34 +3,33 @@
    ============================================================ */
 
 :root {
-  /* Accent (overridable by theme settings) — deep corporate blue */
-  --accent-h: 255;
-  --accent: oklch(0.48 0.13 var(--accent-h));
-  --accent-strong: oklch(0.40 0.14 var(--accent-h));
-  --accent-soft: oklch(0.95 0.03 var(--accent-h));
-  --accent-softer: oklch(0.97 0.018 var(--accent-h));
-  --accent-ring: oklch(0.48 0.13 var(--accent-h) / 0.30);
-  --on-accent: oklch(0.99 0.01 var(--accent-h));
+  /* Accent — Aperture design system */
+  --accent: #2F5DFF;
+  --accent-strong: #1E46DE;
+  --accent-soft: #EAEFFF;
+  --accent-softer: #F4F6FF;
+  --accent-ring: rgb(47 93 255 / 0.30);
+  --on-accent: #FFFFFF;
 
-  /* Neutrals — subtly cool */
-  --bg: oklch(0.985 0.003 250);
-  --surface: oklch(1 0 0);
-  --surface-2: oklch(0.975 0.004 250);
-  --surface-3: oklch(0.96 0.005 250);
-  --border: oklch(0.915 0.005 250);
-  --border-strong: oklch(0.86 0.006 250);
-  --text: oklch(0.26 0.012 255);
-  --text-2: oklch(0.44 0.012 255);
-  --muted: oklch(0.58 0.011 255);
-  --faint: oklch(0.72 0.008 255);
+  /* Neutrals — Aperture palette (Ink / Slate / Canvas / Line) */
+  --bg: #F6F7F9;
+  --surface: #FFFFFF;
+  --surface-2: #FAFBFC;
+  --surface-3: #F1F2F5;
+  --border: #E4E7EC;
+  --border-strong: #D2D6DE;
+  --text: #14161A;
+  --text-2: #454A54;
+  --muted: #5B616E;
+  --faint: #8A8F99;
 
   /* Status */
-  --green: oklch(0.58 0.12 150);
-  --green-soft: oklch(0.95 0.04 150);
-  --amber: oklch(0.72 0.13 75);
-  --amber-soft: oklch(0.95 0.05 80);
-  --red: oklch(0.58 0.16 25);
-  --red-soft: oklch(0.95 0.04 25);
+  --green: #1A9C6D;
+  --green-soft: #E8F6F0;
+  --amber: #B5710B;
+  --amber-soft: #FBF1E1;
+  --red: #D64545;
+  --red-soft: #FCEAEA;
   --violet: oklch(0.55 0.14 295);
   --violet-soft: oklch(0.95 0.04 295);
   --teal: oklch(0.6 0.1 200);
@@ -59,37 +58,38 @@
   --sidebar-w: 248px;
   --topbar-h: 60px;
 
-  /* Body font follows the design system (Aptos / Segoe UI on Windows & Office),
-     falling back to the bundled IBM Plex Sans (next/font) elsewhere. */
-  --font: 'Aptos', 'Segoe UI', var(--font-plex-sans), system-ui, -apple-system, sans-serif;
-  --mono: var(--font-plex-mono), ui-monospace, monospace;
+  /* Aperture type system: Inter carries every interface role, IBM Plex Mono
+     is reserved for anything measured (currency, IDs, timestamps) so digits
+     stay tabular and read as data, not prose. */
+  --font: var(--font-inter), 'Inter', system-ui, -apple-system, sans-serif;
+  --mono: var(--font-plex-mono), 'IBM Plex Mono', ui-monospace, monospace;
 }
 
 [data-theme="dark"] {
-  --accent: oklch(0.66 0.13 var(--accent-h));
-  --accent-strong: oklch(0.74 0.12 var(--accent-h));
-  --accent-soft: oklch(0.32 0.07 var(--accent-h));
-  --accent-softer: oklch(0.27 0.04 var(--accent-h));
-  --accent-ring: oklch(0.66 0.13 var(--accent-h) / 0.35);
-  --on-accent: oklch(0.16 0.02 var(--accent-h));
+  --accent: #6E8CFF;
+  --accent-strong: #93AAFF;
+  --accent-soft: #253156;
+  --accent-softer: #1C2440;
+  --accent-ring: rgb(110 140 255 / 0.35);
+  --on-accent: #0B0F1A;
 
-  --bg: oklch(0.20 0.012 255);
-  --surface: oklch(0.245 0.013 255);
-  --surface-2: oklch(0.225 0.012 255);
-  --surface-3: oklch(0.29 0.014 255);
-  --border: oklch(0.33 0.013 255);
-  --border-strong: oklch(0.40 0.014 255);
-  --text: oklch(0.95 0.006 255);
-  --text-2: oklch(0.80 0.01 255);
-  --muted: oklch(0.66 0.012 255);
-  --faint: oklch(0.52 0.012 255);
+  --bg: #14161A;
+  --surface: #1C1F26;
+  --surface-2: #20232B;
+  --surface-3: #262A33;
+  --border: #2A2E37;
+  --border-strong: #363B46;
+  --text: #F6F7F9;
+  --text-2: #C7CAD3;
+  --muted: #9DA2AD;
+  --faint: #6E7182;
 
-  --green: oklch(0.72 0.13 150);
-  --green-soft: oklch(0.33 0.06 150);
-  --amber: oklch(0.80 0.12 80);
-  --amber-soft: oklch(0.36 0.06 75);
-  --red: oklch(0.70 0.15 25);
-  --red-soft: oklch(0.35 0.07 25);
+  --green: #34C38F;
+  --green-soft: #16302A;
+  --amber: #E0972A;
+  --amber-soft: #362B14;
+  --red: #F16565;
+  --red-soft: #3A2020;
   --violet: oklch(0.72 0.12 295);
   --violet-soft: oklch(0.34 0.06 295);
   --teal: oklch(0.72 0.09 200);

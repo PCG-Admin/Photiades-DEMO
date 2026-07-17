@@ -565,7 +565,7 @@ export function CaptureView() {
                 <CapSelect value={form.companyCode} onChange={v => set('companyCode', v)} options={CAP_COMPANY_CODES} />
                 {!form.companyCode && <div className="cap-err"><I.alert size={12} />{tr('Not found on document — select the correct code')}</div>}
               </CapField>
-              <CapField label={tr('Invoice Number')} hlKey="invoiceNo" activeField={activeField} onSelect={setActiveField}><CapInput value={form.invoiceNumber} onChange={v => set('invoiceNumber', v)} chevron /></CapField>
+              <CapField label={tr('Invoice Number')} hlKey="invoiceNo" activeField={activeField} onSelect={setActiveField}><CapInput value={form.invoiceNumber} readOnly /></CapField>
               <CapField label={tr('Vendor Reference')} hlKey="vendorRef" activeField={activeField} onSelect={setActiveField}><CapInput value={form.vendorRef} onChange={v => set('vendorRef', v)} chevron /></CapField>
               <CapField label={tr('Document Number')}><CapInput value={form.documentNumber} onChange={v => set('documentNumber', v)} chevron /></CapField>
 
@@ -633,7 +633,7 @@ export function CaptureView() {
                 <CapSelect value={form.companyCode} onChange={v => set('companyCode', v)} options={CAP_COMPANY_CODES} />
                 {!form.companyCode && <div className="cap-err"><I.alert size={12} />{tr('Not found on document — select the correct code')}</div>}
               </CapField>
-              <CapField label={tr('Invoice Number')} hlKey="invoiceNo" activeField={activeField} onSelect={setActiveField}><CapInput value={form.invoiceNumber} onChange={v => set('invoiceNumber', v)} chevron /></CapField>
+              <CapField label={tr('Invoice Number')} hlKey="invoiceNo" activeField={activeField} onSelect={setActiveField}><CapInput value={form.invoiceNumber} readOnly /></CapField>
               <CapField label={tr('Vendor Reference')} hlKey="vendorRef" activeField={activeField} onSelect={setActiveField}><CapInput value={form.vendorRef} onChange={v => set('vendorRef', v)} chevron /></CapField>
 
               <CapField label={tr('SAP Posting Type')}>

@@ -518,7 +518,7 @@ function InvoiceForm({ inv, hoverField, setHoverField, onSave, toast }: {
           </div>
         </FF>
         <FF label={tr('Invoice Number')} hk="invoiceNo" hoverField={hoverField} setHoverField={setHoverField}>
-          <input type="text" className="input mono" value={form.invoiceNumber} onChange={e => set('invoiceNumber', e.target.value)} />
+          <input type="text" className="input mono" value={form.invoiceNumber} readOnly style={{ background: 'var(--surface-2)', color: 'var(--muted)' }} />
         </FF>
 
         <FF label={tr('Purchase Order Number')} hk="po" hoverField={hoverField} setHoverField={setHoverField}>

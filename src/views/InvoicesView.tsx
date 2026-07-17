@@ -322,23 +322,7 @@ function InvoiceDetail({ code, onBack, onSave, onDelete }: {
       )}
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.05fr', gap: 'var(--gap-5)', alignItems: 'start' }}>
-        {/* LEFT: the document uploaded at capture time, if any */}
-        <div className="card" style={{ position: 'sticky', top: 0 }}>
-          <div className="card-head"><div className="card-title">{tr('Source document')}</div></div>
-          <div style={{ maxHeight: 'calc(100vh - 230px)', overflowY: 'auto', padding: 24, background: 'var(--surface-2)' }}>
-            {inv.documentUrl ? (
-              <DocumentHighlightPreview url={inv.documentUrl} mimeType={inv.document_mime_type} fileName={inv.code} />
-            ) : (
-              <div className="empty" style={{ padding: '60px 24px' }}>
-                <I.doc size={32} />
-                <div style={{ marginTop: 10 }}>{tr('No stored document')}</div>
-                <div className="faint" style={{ fontSize: 12, marginTop: 4 }}>{tr('This invoice was captured before document storage was added')}</div>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* RIGHT: extraction + validation */}
+        {/* LEFT: extraction + validation */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--gap-5)' }}>
           {/* Invoice indexing / storage form */}
           <InvoiceForm key={inv.id} inv={inv} hoverField={hoverField} setHoverField={setHoverField} onSave={handleSave} toast={toast} />
@@ -407,6 +391,24 @@ function InvoiceDetail({ code, onBack, onSave, onDelete }: {
                 </div>
               ))}
             </div>
+          </div>
+        </div>
+
+        {/* RIGHT: the document uploaded at capture time, if any — read-only,
+            no editable fields here; corrections happen in the form to the
+            left. */}
+        <div className="card" style={{ position: 'sticky', top: 0 }}>
+          <div className="card-head"><div className="card-title">{tr('Source document')}</div></div>
+          <div style={{ maxHeight: 'calc(100vh - 230px)', overflowY: 'auto', padding: 24, background: 'var(--surface-2)' }}>
+            {inv.documentUrl ? (
+              <DocumentHighlightPreview url={inv.documentUrl} mimeType={inv.document_mime_type} fileName={inv.code} />
+            ) : (
+              <div className="empty" style={{ padding: '60px 24px' }}>
+                <I.doc size={32} />
+                <div style={{ marginTop: 10 }}>{tr('No stored document')}</div>
+                <div className="faint" style={{ fontSize: 12, marginTop: 4 }}>{tr('This invoice was captured before document storage was added')}</div>
+              </div>
+            )}
           </div>
         </div>
       </div>

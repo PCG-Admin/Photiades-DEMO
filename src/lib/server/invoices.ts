@@ -1,7 +1,6 @@
 'use server';
 
 import { createServiceClient } from '@/lib/supabase/service';
-import { genInvoiceCode } from '@/lib/server/codes';
 import { requireRole } from '@/lib/server/users';
 import { createWorkflowInstance } from '@/lib/server/workflows';
 import { recordAuditEvent } from '@/lib/server/audit';
@@ -136,6 +135,7 @@ export async function updateInvoiceFields(id: string, patch: Partial<InvoiceRow>
 }
 
 export interface CaptureStoreInput {
+  code: string;      // pre-generated client-side (genInvoiceCode) so the code shown during review matches what's actually stored
   vendor: string;
   invoiceNo: string;
   date: string;      // ISO date
@@ -167,7 +167,7 @@ export async function createInvoiceFromExtraction(input: CaptureStoreInput, file
   const total = input.amount || subtotal;
   const vat = Math.max(0, total - subtotal);
 
-  const code = genInvoiceCode();
+  const code = input.code;
   const documentPath = file ? await uploadInvoiceDocument(file, code) : null;
 
   const invoiceRow = {

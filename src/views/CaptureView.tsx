@@ -11,6 +11,7 @@ import { useToast } from '@/components/providers/ToastProvider';
 import { useGo } from '@/lib/navigation';
 import { extractDocument } from '@/lib/server/extraction';
 import { createInvoiceFromExtraction, findDuplicateInvoice, findDuplicateInvoiceByHash } from '@/lib/server/invoices';
+import { genInvoiceCode } from '@/lib/server/codes';
 import { DocumentHighlightPreview } from '@/components/DocumentHighlightPreview';
 import { sha256Hex } from '@/lib/hash';
 import { ACCEPTED_UPLOAD_TYPES, ACCEPTED_UPLOAD_EXTENSIONS, MAX_UPLOAD_BYTES } from '@/lib/uploadConstraints';
@@ -113,6 +114,10 @@ type DuplicateReason = 'file' | 'invoice' | 'batch' | null;
 interface CapDoc {
   id: string;
   kind: CapKind;
+  // Generated up front (not at Store time) so the code shown throughout
+  // review is the exact one that ends up stored — previously the server
+  // generated its own code at Store, which the reviewer never saw in advance.
+  code: string;
   file: File;
   previewUrl: string;
   form: CapForm;
@@ -134,7 +139,7 @@ interface CapDoc {
 
 function makeDoc(id: string, file: File, kind: CapKind): CapDoc {
   return {
-    id, kind, file, previewUrl: URL.createObjectURL(file),
+    id, kind, code: genInvoiceCode(), file, previewUrl: URL.createObjectURL(file),
     form: { ...INITIAL_FORM }, rows: [], lineItems: [], materialRows: [], boxes: [],
     confidence: null, extracting: false, extractError: null,
     documentHash: null, checkingDuplicate: false,
@@ -317,7 +322,7 @@ export function CaptureView() {
 
   async function store() {
     if (!active) return;
-    const { kind, form, lineItems, materialRows, documentHash, confidence, duplicateOf, duplicateReason, overrideDuplicate, file } = active;
+    const { kind, code, form, lineItems, materialRows, documentHash, confidence, duplicateOf, duplicateReason, overrideDuplicate, file } = active;
     if (dateTooOld(form.date)) { toast(`Date cannot be more than ${MAX_DATE_AGE_MONTHS} months old`); return; }
     if (!form.vendor.trim() || !form.invoiceNumber.trim() || !form.date || !form.companyCode) {
       toast('Vendor, Invoice Number, Date, and Company Code are required'); return;
@@ -331,6 +336,7 @@ export function CaptureView() {
     setStoringId(active.id);
     try {
       const invoice = await createInvoiceFromExtraction({
+        code,
         vendor: form.vendor,
         invoiceNo: form.invoiceNumber,
         date: form.date,
@@ -542,6 +548,7 @@ export function CaptureView() {
             <>
               <CapField label={tr('Document Type')}><CapInput value={tr('Special Invoice')} readOnly /></CapField>
               <CapField label={tr('Status')}><CapInput value={form.status} readOnly /></CapField>
+              <CapField label={tr('Invoice Code')}><CapInput value={active.code} readOnly /></CapField>
 
               <CapField label={tr('Date')} hlKey="date" activeField={activeField} onSelect={setActiveField}>
                 <CapDate value={form.date} onChange={v => set('date', v)} active invalid={dateInvalid} />
@@ -609,6 +616,7 @@ export function CaptureView() {
               <CapField label={tr('Document Type')}><CapInput value={form.docType} readOnly /></CapField>
               <CapField label={tr('Status')}><CapInput value={form.status} readOnly /></CapField>
               <CapField label={tr('XML Status')}><CapInput value={form.xmlStatus} readOnly /></CapField>
+              <CapField label={tr('Invoice Code')}><CapInput value={active.code} readOnly /></CapField>
 
               <CapField label={tr('Date')} hlKey="date" activeField={activeField} onSelect={setActiveField}>
                 <CapDate value={form.date} onChange={v => set('date', v)} active invalid={dateInvalid} />

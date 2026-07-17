@@ -106,7 +106,9 @@ export function WorkflowsView({ initialInstances, initialOpen = null }: { initia
                         <div className="vendor">{vendor}</div>
                         <div className="amt">{fmtMoney(amount)}</div>
                         <div className="meta">
-                          <span className="mono">{po || invoiceCode}</span>
+                          <span className="mono" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flexShrink: 1 }} title={`${invoiceCode}${po ? ` · ${po}` : ''}`}>
+                            {invoiceCode}{po ? ` · ${po}` : ''}
+                          </span>
                           <RelativeTime date={new Date(inst.started_at)} />
                         </div>
                       </div>

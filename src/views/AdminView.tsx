@@ -126,7 +126,7 @@ export function AdminView({ initialUsers, initialMappings, initialPermissions }:
 
   return (
     <div className="view-enter">
-      <PageHeader title={tr('User Administration')} sub={tr('Manage users, roles, and access across the Photiades portal.')}
+      <PageHeader title={tr('User Administration')} sub={tr('Manage users, roles, and access across the PCG|MindRift portal.')}
         actions={
           tab === 'Users'
             ? <button className="btn primary" onClick={() => setEdit({ name: '', email: '', role: 'AP Clerk', dept: 'Finance', status: 'Active', isNew: true })}><I.plus size={16} />{tr('Add user')}</button>
@@ -274,7 +274,7 @@ function UserModal({ user, saving, onClose, onSave }: { user: EditUser; saving: 
       </>}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
         <div className="field"><label>{tr('Full name')}</label><input className="input" value={form.name} onChange={e => set('name', e.target.value)} placeholder="e.g. Andreas Pavlou" /></div>
-        <div className="field"><label>{tr('Email')}</label><input className="input" value={form.email} onChange={e => set('email', e.target.value)} placeholder="name@photiades.com.cy" /></div>
+        <div className="field"><label>{tr('Email')}</label><input className="input" value={form.email} onChange={e => set('email', e.target.value)} placeholder="name@pcg.com" /></div>
         {user.isNew && (
           <div className="field">
             <label>{tr('Temporary password')}</label>

@@ -7,7 +7,7 @@ import { getCurrentAppUser, requireRole } from '@/lib/server/users';
 import type { RolePermissionRow, PortalModule, AppUserRow } from '@/lib/supabase/types';
 
 export async function listRolePermissions(): Promise<RolePermissionRow[]> {
-  const { data, error } = await createServiceClient().from('role_permissions').select('*').order('role').order('module')
+  const { data, error } = await createServiceClient().from('invoice_role_permissions').select('*').order('role').order('module')
     .overrideTypes<RolePermissionRow[], { merge: false }>();
   if (error) throw error;
   return data;
@@ -19,7 +19,7 @@ export async function listRolePermissions(): Promise<RolePermissionRow[]> {
 export async function setRolePermission(role: AppUserRow['role'], module: PortalModule, canAccess: boolean): Promise<void> {
   await requireRole('Administrator');
   if (role === 'Administrator') return;
-  const { error } = await createServiceClient().from('role_permissions')
+  const { error } = await createServiceClient().from('invoice_role_permissions')
     .upsert({ role, module, can_access: canAccess } as never, { onConflict: 'role,module' });
   if (error) throw error;
   await recordAuditEvent({
@@ -36,7 +36,7 @@ export async function getAccessibleModules(role: AppUserRow['role']): Promise<Se
   if (role === 'Administrator') {
     return new Set(['dashboard', 'capture', 'invoices', 'workflows', 'reports', 'audit', 'notifications', 'admin']);
   }
-  const { data, error } = await createServiceClient().from('role_permissions').select('module, can_access').eq('role', role)
+  const { data, error } = await createServiceClient().from('invoice_role_permissions').select('module, can_access').eq('role', role)
     .overrideTypes<Pick<RolePermissionRow, 'module' | 'can_access'>[], { merge: false }>();
   if (error) throw error;
   return new Set(data.filter(r => r.can_access).map(r => r.module));

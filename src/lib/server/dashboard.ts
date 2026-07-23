@@ -36,7 +36,7 @@ export async function getDashboardData(): Promise<DashboardData> {
     .overrideTypes<InvoiceRow[], { merge: false }>();
   if (invErr) throw invErr;
 
-  const { data: instances, error: instErr } = await supabase.from('workflow_instances').select('*')
+  const { data: instances, error: instErr } = await supabase.from('invoice_workflow_instances').select('*')
     .overrideTypes<WorkflowInstanceRow[], { merge: false }>();
   if (instErr) throw instErr;
 

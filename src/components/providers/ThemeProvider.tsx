@@ -19,7 +19,7 @@ export const THEME_DEFAULTS: ThemeState = {
   lang: 'en',
 };
 
-const STORAGE_KEY = 'photiades-theme';
+const STORAGE_KEY = 'pcg-theme';
 
 interface ThemeContextValue {
   t: ThemeState;

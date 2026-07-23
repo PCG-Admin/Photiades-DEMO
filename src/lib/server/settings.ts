@@ -10,7 +10,7 @@ export async function getApprovalThreshold(): Promise<number> {
   // .overrideTypes(...) bypasses postgrest-js's select-string type parser,
   // which resolves to `never` under the project's TypeScript 6 — see the
   // same workaround in users.ts.
-  const { data, error } = await createServiceClient().from('app_settings').select('approval_threshold').eq('id', true).single()
+  const { data, error } = await createServiceClient().from('invoice_app_settings').select('approval_threshold').eq('id', true).single()
     .overrideTypes<Pick<AppSettingsRow, 'approval_threshold'>, { merge: false }>();
   if (error) throw error;
   return data.approval_threshold;
@@ -18,6 +18,6 @@ export async function getApprovalThreshold(): Promise<number> {
 
 export async function updateApprovalThreshold(value: number): Promise<void> {
   const row = { approval_threshold: value };
-  const { error } = await createServiceClient().from('app_settings').update(row as never).eq('id', true);
+  const { error } = await createServiceClient().from('invoice_app_settings').update(row as never).eq('id', true);
   if (error) throw error;
 }

@@ -3,7 +3,7 @@
 # once the real project exists, then `npx supabase db push` to apply
 # supabase/migrations/*.sql.
 
-project_id = "photiades-workflow-portal"
+project_id = "pcg-workflow-portal"
 
 [api]
 enabled = true

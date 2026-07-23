@@ -38,7 +38,7 @@ export async function getCurrentAppUser(): Promise<CurrentAppUser> {
   // .overrideTypes(...) bypasses postgrest-js's select-string type parser,
   // which resolves to `never` under the project's TypeScript 6.
   const { data: profile } = await createServiceClient()
-    .from('app_users')
+    .from('invoice_app_users')
     .select('id, name, email, role, dept')
     .eq('id', user.id)
     .single()
@@ -61,7 +61,7 @@ export async function requireRole(...allowed: CurrentAppUser['role'][]): Promise
 // ---- Admin CRUD (SOW §5.8 User Administration) ----
 
 export async function listAppUsers(): Promise<AppUserRow[]> {
-  const { data, error } = await createServiceClient().from('app_users').select('*').order('name')
+  const { data, error } = await createServiceClient().from('invoice_app_users').select('*').order('name')
     .overrideTypes<AppUserRow[], { merge: false }>();
   if (error) throw error;
   return data;
@@ -95,7 +95,7 @@ export async function createAppUser(input: NewAppUser, tempPassword: string): Pr
   // `as never` bypasses postgrest-js's insert-argument type resolution,
   // which breaks down to `never` under the project's TypeScript 6.
   const { data, error } = await supabase
-    .from('app_users')
+    .from('invoice_app_users')
     .insert(row as never)
     .select('*')
     .single()
@@ -114,12 +114,12 @@ export async function createAppUser(input: NewAppUser, tempPassword: string): Pr
 export async function updateAppUser(id: string, patch: Partial<NewAppUser & { status: AppUserRow['status'] }>): Promise<AppUserRow> {
   await requireRole('Administrator');
   const supabase = createServiceClient();
-  const { data: before, error: beforeErr } = await supabase.from('app_users').select('*').eq('id', id).single()
+  const { data: before, error: beforeErr } = await supabase.from('invoice_app_users').select('*').eq('id', id).single()
     .overrideTypes<AppUserRow, { merge: false }>();
   if (beforeErr) throw beforeErr;
 
   const { data, error } = await supabase
-    .from('app_users')
+    .from('invoice_app_users')
     .update(patch as never)
     .eq('id', id)
     .select('*')
@@ -144,7 +144,7 @@ export async function updateAppUser(id: string, patch: Partial<NewAppUser & { st
 /** Used by WorkflowsView's "Select user to approve" (Additional Approval). */
 export async function findAppUserByName(name: string): Promise<AppUserRow | null> {
   const { data } = await createServiceClient()
-    .from('app_users').select('*').eq('name', name).limit(1).maybeSingle()
+    .from('invoice_app_users').select('*').eq('name', name).limit(1).maybeSingle()
     .overrideTypes<AppUserRow | null, { merge: false }>();
   return data;
 }

@@ -14,7 +14,7 @@ export function LoginForm() {
     <form action={formAction} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       <div className="field">
         <label htmlFor="email">Email</label>
-        <input id="email" name="email" type="email" className="input" placeholder="name@photiades.com.cy" autoComplete="username" required />
+        <input id="email" name="email" type="email" className="input" placeholder="name@pcg.com" autoComplete="username" required />
       </div>
       <div className="field">
         <label htmlFor="password">Password</label>

@@ -51,7 +51,7 @@ export async function recordAuditEvent(input: RecordAuditEventInput): Promise<vo
   // `as never` bypasses postgrest-js's insert-argument type resolution,
   // which breaks down to `never` under the project's TypeScript 6 — see
   // the .overrideTypes(...) workaround used for reads in this codebase.
-  const { error } = await supabase.from('audit_events').insert(row as never);
+  const { error } = await supabase.from('invoice_audit_events').insert(row as never);
   if (error) throw error;
 }
 
@@ -65,7 +65,7 @@ export interface AuditEventFilters {
  * InvoicesView (SOW §5.7 — immutable per-invoice action log, T149). */
 export async function getAuditEvents(filters: AuditEventFilters = {}): Promise<AuditEventRow[]> {
   const supabase = createServiceClient();
-  let query = supabase.from('audit_events').select('*').order('occurred_at', { ascending: false });
+  let query = supabase.from('invoice_audit_events').select('*').order('occurred_at', { ascending: false });
   if (filters.invoiceId) query = query.eq('invoice_id', filters.invoiceId);
   if (filters.module) query = query.eq('module', filters.module);
   if (filters.limit) query = query.limit(filters.limit);

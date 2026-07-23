@@ -1,6 +1,6 @@
-# Photiades Workflow Portal
+# PCG | MindRift Workflow Portal
 
-An invoice and document-processing portal for Photiades Group, built against
+An invoice and document-processing portal for PCG | MindRift, built against
 the client SOW, running on a real Supabase (Postgres) backend.
 
 Modules: **Dashboard**, **Document Capture** (Gemini-based field extraction),

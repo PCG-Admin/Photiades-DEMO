@@ -1,4 +1,4 @@
--- Creates one real login account for the Photiades Workflow Portal.
+-- Creates one real login account for the PCG | MindRift Workflow Portal.
 --
 -- EDIT the three values below, then paste this whole file into the
 -- Supabase SQL Editor (dashboard → SQL Editor → New query → Run).
@@ -7,8 +7,8 @@
 do $$
 declare
   new_user_id uuid := gen_random_uuid();
-  user_email text := 'admin@photiades.com';   -- <-- change this
-  user_password text := 'Photiades123!';                        -- <-- change this
+  user_email text := 'invoices.admin@pcg.com';   -- <-- change this
+  user_password text := 'password123';                        -- <-- change this
   user_name text := 'Admin';                      -- <-- change this
   user_role text := 'Administrator';                           -- Administrator | AP Manager | AP Clerk | Approver | Auditor | Viewer
   user_dept text := 'Finance';                                 -- <-- change this
@@ -17,13 +17,17 @@ begin
   insert into auth.users (
     instance_id, id, aud, role, email, encrypted_password,
     email_confirmed_at, raw_app_meta_data, raw_user_meta_data,
-    created_at, updated_at, confirmation_token, recovery_token
+    created_at, updated_at, confirmation_token, recovery_token,
+    email_change, email_change_token_new, email_change_token_current,
+    phone_change, phone_change_token
   ) values (
     '00000000-0000-0000-0000-000000000000',
     new_user_id, 'authenticated', 'authenticated', user_email,
     crypt(user_password, gen_salt('bf')),
     now(), '{"provider":"email","providers":["email"]}', '{}',
-    now(), now(), '', ''
+    now(), now(), '', '',
+    '', '', '',
+    '', ''
   );
 
   -- 2. required so email/password sign-in actually works
@@ -36,6 +40,6 @@ begin
   );
 
   -- 3. this app's own profile row (name/role/department shown in the UI)
-  insert into public.app_users (id, name, email, role, dept)
+  insert into public.invoice_app_users (id, name, email, role, dept)
   values (new_user_id, user_name, user_email, user_role, user_dept);
 end $$;

@@ -147,8 +147,8 @@ export const TRANSLATIONS: Record<Exclude<Lang, 'en'>, Record<string, string>> =
       'Λειτουργική εικόνα σε καταχώρηση, επεξεργασία και εγκρίσεις.',
     'Immutable, time-stamped log of every action across the portal.':
       'Αμετάβλητο, χρονοσημασμένο αρχείο κάθε ενέργειας στην πύλη.',
-    'Manage users, roles, and access across the Photiades portal.':
-      'Διαχείριση χρηστών, ρόλων και πρόσβασης στην πύλη Photiades.',
+    'Manage users, roles, and access across the PCG|MindRift portal.':
+      'Διαχείριση χρηστών, ρόλων και πρόσβασης στην πύλη PCG|MindRift.',
 
     // Misc tab/status terms
     'All': 'Όλα',

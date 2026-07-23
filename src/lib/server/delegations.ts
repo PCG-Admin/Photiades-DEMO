@@ -14,7 +14,7 @@ function today(): string {
  * today or the future). */
 export async function getMyDelegation(): Promise<DelegationRow | null> {
   const user = await getCurrentAppUser();
-  const { data, error } = await createServiceClient().from('delegations').select('*')
+  const { data, error } = await createServiceClient().from('invoice_delegations').select('*')
     .eq('user_id', user.id).gte('end_date', today()).order('start_date', { ascending: false }).limit(1).maybeSingle()
     .overrideTypes<DelegationRow | null, { merge: false }>();
   if (error) throw error;
@@ -26,8 +26,8 @@ export async function getMyDelegation(): Promise<DelegationRow | null> {
 export async function setMyDelegation(backupUserId: string, startDate: string, endDate: string, note: string | null): Promise<DelegationRow> {
   const user = await getCurrentAppUser();
   const supabase = createServiceClient();
-  await supabase.from('delegations').delete().eq('user_id', user.id);
-  const { data, error } = await supabase.from('delegations')
+  await supabase.from('invoice_delegations').delete().eq('user_id', user.id);
+  const { data, error } = await supabase.from('invoice_delegations')
     .insert({ user_id: user.id, backup_user_id: backupUserId, start_date: startDate, end_date: endDate, note } as never)
     .select('*').single()
     .overrideTypes<DelegationRow, { merge: false }>();
@@ -41,7 +41,7 @@ export async function setMyDelegation(backupUserId: string, startDate: string, e
 
 export async function clearMyDelegation(): Promise<void> {
   const user = await getCurrentAppUser();
-  const { error } = await createServiceClient().from('delegations').delete().eq('user_id', user.id);
+  const { error } = await createServiceClient().from('invoice_delegations').delete().eq('user_id', user.id);
   if (error) throw error;
   await recordAuditEvent({ action: 'Cleared backup approver', module: 'Admin', target: user.name });
 }
@@ -50,7 +50,7 @@ export async function clearMyDelegation(): Promise<void> {
  * backup — used by getApprovalsInbox() so tasks pinned to a specific
  * assignee_id surface in the backup's inbox while the primary is out. */
 export async function getUsersWhoDelegatedToMe(userId: string): Promise<string[]> {
-  const { data, error } = await createServiceClient().from('delegations').select('user_id')
+  const { data, error } = await createServiceClient().from('invoice_delegations').select('user_id')
     .eq('backup_user_id', userId).lte('start_date', today()).gte('end_date', today())
     .overrideTypes<Pick<DelegationRow, 'user_id'>[], { merge: false }>();
   if (error) throw error;

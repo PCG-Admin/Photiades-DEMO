@@ -60,7 +60,7 @@ export async function createWorkflowInstance(invoiceId: string, wfId: WorkflowIn
   // `as never` bypasses postgrest-js's insert-argument type resolution,
   // which breaks down to `never` under the project's TypeScript 6.
   const { data, error } = await createServiceClient()
-    .from('workflow_instances')
+    .from('invoice_workflow_instances')
     .insert(row as never)
     .select('*')
     .single()
@@ -82,7 +82,7 @@ export interface ApprovalInboxItem {
 
 export async function getWorkflowInstances(): Promise<WorkflowInstanceRow[]> {
   const { data, error } = await createServiceClient()
-    .from('workflow_instances').select('*').order('started_at', { ascending: false })
+    .from('invoice_workflow_instances').select('*').order('started_at', { ascending: false })
     .overrideTypes<WorkflowInstanceRow[], { merge: false }>();
   if (error) throw error;
   return data;
@@ -116,7 +116,7 @@ export async function getWorkflowInstancesWithInvoices(): Promise<WorkflowInstan
 
 async function withHistory(instance: WorkflowInstanceRow): Promise<WorkflowInstanceWithHistory> {
   const { data: history, error } = await createServiceClient()
-    .from('workflow_history').select('*').eq('instance_id', instance.id).order('occurred_at')
+    .from('invoice_workflow_history').select('*').eq('instance_id', instance.id).order('occurred_at')
     .overrideTypes<WorkflowHistoryRow[], { merge: false }>();
   if (error) throw error;
   return { ...instance, history };
@@ -124,7 +124,7 @@ async function withHistory(instance: WorkflowInstanceRow): Promise<WorkflowInsta
 
 export async function getWorkflowInstance(code: string): Promise<WorkflowInstanceWithHistory | null> {
   const { data: instance, error } = await createServiceClient()
-    .from('workflow_instances').select('*').eq('code', code).single()
+    .from('invoice_workflow_instances').select('*').eq('code', code).single()
     .overrideTypes<WorkflowInstanceRow, { merge: false }>();
   if (error) return null;
   return withHistory(instance);
@@ -160,7 +160,7 @@ export async function getWorkflowInstanceDetail(code: string): Promise<WorkflowI
  * practice exactly one is created per invoice at capture time. */
 export async function getWorkflowInstanceForInvoice(invoiceId: string): Promise<WorkflowInstanceWithHistory | null> {
   const { data: instance, error } = await createServiceClient()
-    .from('workflow_instances').select('*').eq('invoice_id', invoiceId).limit(1).maybeSingle()
+    .from('invoice_workflow_instances').select('*').eq('invoice_id', invoiceId).limit(1).maybeSingle()
     .overrideTypes<WorkflowInstanceRow | null, { merge: false }>();
   if (error || !instance) return null;
   return withHistory(instance);
@@ -172,7 +172,7 @@ async function insertHistoryRow(instanceId: string, taskId: string, taskName: st
     action_key: actionKey, action_label: actionLabel,
     actor_id: actorId, actor_name: actorName, fields,
   };
-  const { error } = await createServiceClient().from('workflow_history').insert(row as never);
+  const { error } = await createServiceClient().from('invoice_workflow_history').insert(row as never);
   if (error) throw error;
 }
 
@@ -190,7 +190,7 @@ export async function advanceWorkflowTask(instanceId: string, actionKey: string,
   const currentUser = await getCurrentAppUser();
   const actorId = currentUser.id === 'guest' ? null : currentUser.id;
 
-  const { data: instance, error: instErr } = await supabase.from('workflow_instances').select('*').eq('id', instanceId).single()
+  const { data: instance, error: instErr } = await supabase.from('invoice_workflow_instances').select('*').eq('id', instanceId).single()
     .overrideTypes<WorkflowInstanceRow, { merge: false }>();
   if (instErr) throw instErr;
 
@@ -352,7 +352,7 @@ export async function advanceWorkflowTask(instanceId: string, actionKey: string,
     .filter(key => invoicePatch[key as keyof InvoiceRow] !== invoice[key as keyof InvoiceRow])
     .map(key => ({ field: key, before: invoice[key as keyof InvoiceRow], after: invoicePatch[key as keyof InvoiceRow] }));
 
-  const { error: updErr } = await supabase.from('workflow_instances').update(instancePatch as never).eq('id', instanceId);
+  const { error: updErr } = await supabase.from('invoice_workflow_instances').update(instancePatch as never).eq('id', instanceId);
   if (updErr) throw updErr;
 
   if (Object.keys(invoicePatch).length > 0) {
@@ -385,7 +385,7 @@ export async function advanceWorkflowTask(instanceId: string, actionKey: string,
     }
   }
 
-  const { data: updatedInstance, error: reErr } = await supabase.from('workflow_instances').select('*').eq('id', instanceId).single()
+  const { data: updatedInstance, error: reErr } = await supabase.from('invoice_workflow_instances').select('*').eq('id', instanceId).single()
     .overrideTypes<WorkflowInstanceRow, { merge: false }>();
   if (reErr) throw reErr;
   return withHistory(updatedInstance);
@@ -399,7 +399,7 @@ export async function getApprovalsInbox(userRole: string, userId: string): Promi
   // back to whoever handled the previous step, and that's exactly the
   // "In Progress"-equivalent state they need to see and act on.
   const { data: instances, error } = await createServiceClient()
-    .from('workflow_instances').select('*').in('status', ['In Progress', 'Info Requested']).order('started_at')
+    .from('invoice_workflow_instances').select('*').in('status', ['In Progress', 'Info Requested']).order('started_at')
     .overrideTypes<WorkflowInstanceRow[], { merge: false }>();
   if (error) throw error;
 

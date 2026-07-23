@@ -6,21 +6,21 @@ import type { AppUserRow, ApproverMappingRow } from '@/lib/supabase/types';
 export type NewApproverMapping = Omit<ApproverMappingRow, 'id' | 'created_at'>;
 
 export async function listApproverMappings(): Promise<ApproverMappingRow[]> {
-  const { data, error } = await createServiceClient().from('approver_mappings').select('*').order('task_id').order('min_amount')
+  const { data, error } = await createServiceClient().from('invoice_approver_mappings').select('*').order('task_id').order('min_amount')
     .overrideTypes<ApproverMappingRow[], { merge: false }>();
   if (error) throw error;
   return data;
 }
 
 export async function createApproverMapping(mapping: NewApproverMapping): Promise<ApproverMappingRow> {
-  const { data, error } = await createServiceClient().from('approver_mappings').insert(mapping as never).select('*').single()
+  const { data, error } = await createServiceClient().from('invoice_approver_mappings').insert(mapping as never).select('*').single()
     .overrideTypes<ApproverMappingRow, { merge: false }>();
   if (error) throw error;
   return data;
 }
 
 export async function deleteApproverMapping(id: string): Promise<void> {
-  const { error } = await createServiceClient().from('approver_mappings').delete().eq('id', id);
+  const { error } = await createServiceClient().from('invoice_approver_mappings').delete().eq('id', id);
   if (error) throw error;
 }
 

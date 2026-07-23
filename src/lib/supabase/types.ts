@@ -193,18 +193,18 @@ export interface DelegationRow {
 export interface Database {
   public: {
     Tables: {
-      app_settings: { Row: AppSettingsRow; Insert: Partial<AppSettingsRow>; Update: Partial<AppSettingsRow>; Relationships: [] };
-      app_users: { Row: AppUserRow; Insert: Omit<AppUserRow, 'created_at' | 'updated_at'> & Partial<Pick<AppUserRow, 'created_at' | 'updated_at'>>; Update: Partial<AppUserRow>; Relationships: [] };
+      invoice_app_settings: { Row: AppSettingsRow; Insert: Partial<AppSettingsRow>; Update: Partial<AppSettingsRow>; Relationships: [] };
+      invoice_app_users: { Row: AppUserRow; Insert: Omit<AppUserRow, 'created_at' | 'updated_at'> & Partial<Pick<AppUserRow, 'created_at' | 'updated_at'>>; Update: Partial<AppUserRow>; Relationships: [] };
       invoices: { Row: InvoiceRow; Insert: Omit<InvoiceRow, 'id' | 'created_at' | 'updated_at'> & Partial<Pick<InvoiceRow, 'id' | 'created_at' | 'updated_at'>>; Update: Partial<InvoiceRow>; Relationships: [] };
       invoice_line_items: { Row: InvoiceLineItemRow; Insert: Omit<InvoiceLineItemRow, 'id'> & Partial<Pick<InvoiceLineItemRow, 'id'>>; Update: Partial<InvoiceLineItemRow>; Relationships: [] };
-      documents: { Row: DocumentRow; Insert: Omit<DocumentRow, 'id' | 'created_at'> & Partial<Pick<DocumentRow, 'id' | 'created_at'>>; Update: Partial<DocumentRow>; Relationships: [] };
-      workflow_instances: { Row: WorkflowInstanceRow; Insert: Omit<WorkflowInstanceRow, 'id' | 'started_at' | 'updated_at'> & Partial<Pick<WorkflowInstanceRow, 'id' | 'started_at' | 'updated_at'>>; Update: Partial<WorkflowInstanceRow>; Relationships: [] };
-      workflow_history: { Row: WorkflowHistoryRow; Insert: Omit<WorkflowHistoryRow, 'id' | 'occurred_at'> & Partial<Pick<WorkflowHistoryRow, 'id' | 'occurred_at'>>; Update: Partial<WorkflowHistoryRow>; Relationships: [] };
-      audit_events: { Row: AuditEventRow; Insert: Omit<AuditEventRow, 'id' | 'occurred_at' | 'invoice_id' | 'changes'> & Partial<Pick<AuditEventRow, 'id' | 'occurred_at' | 'invoice_id' | 'changes'>>; Update: Partial<AuditEventRow>; Relationships: [] };
-      notifications: { Row: NotificationRow; Insert: Omit<NotificationRow, 'id' | 'created_at'> & Partial<Pick<NotificationRow, 'id' | 'created_at'>>; Update: Partial<NotificationRow>; Relationships: [] };
-      approver_mappings: { Row: ApproverMappingRow; Insert: Omit<ApproverMappingRow, 'id' | 'created_at'> & Partial<Pick<ApproverMappingRow, 'id' | 'created_at'>>; Update: Partial<ApproverMappingRow>; Relationships: [] };
-      role_permissions: { Row: RolePermissionRow; Insert: RolePermissionRow; Update: Partial<RolePermissionRow>; Relationships: [] };
-      delegations: { Row: DelegationRow; Insert: Omit<DelegationRow, 'id' | 'created_at'> & Partial<Pick<DelegationRow, 'id' | 'created_at'>>; Update: Partial<DelegationRow>; Relationships: [] };
+      invoice_documents: { Row: DocumentRow; Insert: Omit<DocumentRow, 'id' | 'created_at'> & Partial<Pick<DocumentRow, 'id' | 'created_at'>>; Update: Partial<DocumentRow>; Relationships: [] };
+      invoice_workflow_instances: { Row: WorkflowInstanceRow; Insert: Omit<WorkflowInstanceRow, 'id' | 'started_at' | 'updated_at'> & Partial<Pick<WorkflowInstanceRow, 'id' | 'started_at' | 'updated_at'>>; Update: Partial<WorkflowInstanceRow>; Relationships: [] };
+      invoice_workflow_history: { Row: WorkflowHistoryRow; Insert: Omit<WorkflowHistoryRow, 'id' | 'occurred_at'> & Partial<Pick<WorkflowHistoryRow, 'id' | 'occurred_at'>>; Update: Partial<WorkflowHistoryRow>; Relationships: [] };
+      invoice_audit_events: { Row: AuditEventRow; Insert: Omit<AuditEventRow, 'id' | 'occurred_at' | 'invoice_id' | 'changes'> & Partial<Pick<AuditEventRow, 'id' | 'occurred_at' | 'invoice_id' | 'changes'>>; Update: Partial<AuditEventRow>; Relationships: [] };
+      invoice_notifications: { Row: NotificationRow; Insert: Omit<NotificationRow, 'id' | 'created_at'> & Partial<Pick<NotificationRow, 'id' | 'created_at'>>; Update: Partial<NotificationRow>; Relationships: [] };
+      invoice_approver_mappings: { Row: ApproverMappingRow; Insert: Omit<ApproverMappingRow, 'id' | 'created_at'> & Partial<Pick<ApproverMappingRow, 'id' | 'created_at'>>; Update: Partial<ApproverMappingRow>; Relationships: [] };
+      invoice_role_permissions: { Row: RolePermissionRow; Insert: RolePermissionRow; Update: Partial<RolePermissionRow>; Relationships: [] };
+      invoice_delegations: { Row: DelegationRow; Insert: Omit<DelegationRow, 'id' | 'created_at'> & Partial<Pick<DelegationRow, 'id' | 'created_at'>>; Update: Partial<DelegationRow>; Relationships: [] };
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;

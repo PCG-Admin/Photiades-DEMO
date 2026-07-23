@@ -40,7 +40,7 @@ export async function getInvoiceAging(): Promise<AgingBucket[]> {
 export interface SlaRow { taskName: string; avgHours: number; count: number }
 
 export async function getApprovalSLA(since?: string | null): Promise<SlaRow[]> {
-  let query = createServiceClient().from('workflow_history').select('*').order('instance_id').order('occurred_at');
+  let query = createServiceClient().from('invoice_workflow_history').select('*').order('instance_id').order('occurred_at');
   if (since) query = query.gte('occurred_at', since);
   const { data: history, error } = await query.overrideTypes<WorkflowHistoryRow[], { merge: false }>();
   if (error) throw error;
@@ -68,7 +68,7 @@ export async function getApprovalSLA(since?: string | null): Promise<SlaRow[]> {
 export interface ApproverPerformanceRow { actorName: string; actions: number; avgTurnaroundHours: number | null }
 
 export async function getApproverPerformance(since?: string | null): Promise<ApproverPerformanceRow[]> {
-  let query = createServiceClient().from('workflow_history').select('*').order('instance_id').order('occurred_at');
+  let query = createServiceClient().from('invoice_workflow_history').select('*').order('instance_id').order('occurred_at');
   if (since) query = query.gte('occurred_at', since);
   const { data: history, error } = await query.overrideTypes<WorkflowHistoryRow[], { merge: false }>();
   if (error) throw error;
@@ -98,14 +98,14 @@ export interface DeclinedRow { code: string; vendor: string; amount: number; tas
 
 export async function getDeclinedTrend(since?: string | null): Promise<DeclinedRow[]> {
   const supabase = createServiceClient();
-  let query = supabase.from('workflow_history').select('*').eq('action_key', 'declined').order('occurred_at', { ascending: false });
+  let query = supabase.from('invoice_workflow_history').select('*').eq('action_key', 'declined').order('occurred_at', { ascending: false });
   if (since) query = query.gte('occurred_at', since);
   const { data: history, error } = await query.overrideTypes<WorkflowHistoryRow[], { merge: false }>();
   if (error) throw error;
   if (history.length === 0) return [];
 
   const { data: instances } = await supabase
-    .from('workflow_instances').select('*').in('id', history.map(h => h.instance_id))
+    .from('invoice_workflow_instances').select('*').in('id', history.map(h => h.instance_id))
     .overrideTypes<{ id: string; invoice_id: string }[], { merge: false }>();
   const { data: invoices } = await supabase
     .from('invoices').select('*').in('id', (instances ?? []).map(i => i.invoice_id))

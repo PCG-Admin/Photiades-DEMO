@@ -74,12 +74,12 @@ export function ReportsView() {
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--gap-6)' }}>
+        <CustomExportReport rows={exportRows} />
         <InvoiceAgingReport />
         <ApprovalSlaReport periodDays={periodDays} />
         <ApproverPerformanceReport periodDays={periodDays} />
         <DeclinedInvoicesReport periodDays={periodDays} />
         <PendingPaymentsReport />
-        <CustomExportReport rows={exportRows} />
       </div>
     </div>
   );
@@ -527,14 +527,34 @@ function CustomExportReport({ rows }: { rows: InvoiceRow[] | null }) {
         </div>
 
         {rows && (
-          <div className="row" style={{ justifyContent: 'space-between', paddingTop: 6, borderTop: '1px solid var(--border)' }}>
-            <span className="muted" style={{ fontSize: 13 }}><span className="mono" style={{ fontWeight: 600 }}>{rows.length}</span> {tr('invoices match')}</span>
-            <ExportButtons filename="invoices-export" data={rows.map(r => {
-              const out: Record<string, unknown> = {};
-              allFields.filter(f => fields[f]).forEach(f => { out[f] = r[f]; });
-              return out;
-            })} />
-          </div>
+          <>
+            <div className="row" style={{ justifyContent: 'space-between', paddingTop: 6, borderTop: '1px solid var(--border)' }}>
+              <span className="muted" style={{ fontSize: 13 }}><span className="mono" style={{ fontWeight: 600 }}>{rows.length}</span> {tr('invoices match')}</span>
+              <ExportButtons filename="invoices-export" data={rows.map(r => {
+                const out: Record<string, unknown> = {};
+                allFields.filter(f => fields[f]).forEach(f => { out[f] = r[f]; });
+                return out;
+              })} />
+            </div>
+            {rows.length > 0 && (
+              <table className="tbl">
+                <thead>
+                  <tr>{allFields.filter(f => fields[f]).map(f => <th key={f}>{tr(f)}</th>)}</tr>
+                </thead>
+                <tbody>
+                  {rows.map(r => (
+                    <tr key={r.id}>
+                      {allFields.filter(f => fields[f]).map(f => (
+                        <td key={f} className={f === 'total' ? 'right num' : undefined}>
+                          {f === 'total' ? fmtMoney(r.total) : String(r[f] ?? '—')}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </>
         )}
       </div>
     </div>

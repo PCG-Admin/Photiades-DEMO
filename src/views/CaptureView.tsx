@@ -15,7 +15,7 @@ import { genInvoiceCode } from '@/lib/server/codes';
 import { DocumentHighlightPreview } from '@/components/DocumentHighlightPreview';
 import { sha256Hex } from '@/lib/hash';
 import { ACCEPTED_UPLOAD_TYPES, ACCEPTED_UPLOAD_EXTENSIONS, MAX_UPLOAD_BYTES } from '@/lib/uploadConstraints';
-import { COMPANY_CODES, nonStockDocOptions } from '@/lib/constants';
+import { COMPANY_CODES } from '@/lib/constants';
 import { useTr } from '@/lib/i18n';
 import type { ExtractedInvoice } from '@/lib/gemini/extract';
 import type { InvoiceRow } from '@/lib/supabase/types';
@@ -647,13 +647,8 @@ export function CaptureView() {
               <CapField label={tr('Stock / Non Stock')}>
                 <CapSelect value={form.stockType} onChange={v => set('stockType', v)} options={CAP_STOCK_TYPES} />
               </CapField>
-              <CapField label={tr('Stock Document Number')}>
-                <CapInput value={form.stockDocNumber} onChange={v => set('stockDocNumber', v)} chevron
-                  disabled={form.stockType === 'Non-stock'} />
-              </CapField>
-              <CapField label={tr('Non-Stock Document Number')}>
-                <CapSelect value={form.nonStockDocNumber} onChange={v => set('nonStockDocNumber', v)}
-                  options={nonStockDocOptions(form.nonStockDocNumber)} disabled={form.stockType === 'Stock'} />
+              <CapField label={tr('Document Number')}>
+                <CapInput value={form.stockDocNumber} onChange={v => { set('stockDocNumber', v); set('nonStockDocNumber', v); }} chevron />
               </CapField>
 
               {/* Line items — extracted from the document by Gemini; review/edit before storing */}

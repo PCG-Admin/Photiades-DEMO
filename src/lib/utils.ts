@@ -1,5 +1,5 @@
 export const cx = (...a: Array<string | false | null | undefined>) => a.filter(Boolean).join(' ');
-export const fmtMoney = (n: number, cur = '€') =>
+export const fmtMoney = (n: number, cur = 'R') =>
   cur + n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 export const fmtNum = (n: number) => n.toLocaleString('en-US');
 

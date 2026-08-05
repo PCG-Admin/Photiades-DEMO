@@ -74,12 +74,12 @@ export function ReportsView() {
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--gap-6)' }}>
+        <CustomExportReport rows={exportRows} />
         <InvoiceAgingReport />
         <ApprovalSlaReport periodDays={periodDays} />
         <ApproverPerformanceReport periodDays={periodDays} />
         <DeclinedInvoicesReport periodDays={periodDays} />
         <PendingPaymentsReport />
-        <CustomExportReport rows={exportRows} />
       </div>
     </div>
   );
@@ -495,7 +495,6 @@ function PendingPaymentsReport() {
 // of the last run, lets you choose which fields to include, and exports.
 function CustomExportReport({ rows }: { rows: InvoiceRow[] | null }) {
   const tr = useTr();
-  const [fields, setFields] = useState<Record<string, boolean>>({ code: true, vendor: true, total: true, status: true, due_at: true });
 
   const allFields: (keyof InvoiceRow)[] = ['code', 'vendor', 'invoice_no', 'po', 'total', 'status', 'received_at', 'due_at', 'dept', 'company_code', 'stock_type'];
 
@@ -504,37 +503,41 @@ function CustomExportReport({ rows }: { rows: InvoiceRow[] | null }) {
       <div className="card-head">
         <div className="row" style={{ gap: 12 }}>
           <div style={{ width: 34, height: 34, borderRadius: 9, background: 'var(--accent-soft)', color: 'var(--accent-strong)', display: 'grid', placeItems: 'center', flexShrink: 0 }}><I.filter size={17} /></div>
-          <div><div className="card-title">{tr('Custom Filter Export')}</div><div className="card-sub">{tr('Filter invoices, choose fields, export')}</div></div>
+          <div><div className="card-title">{tr('Custom Filter Export')}</div><div className="card-sub">{tr('Filter invoices and export the matching results')}</div></div>
         </div>
       </div>
       <div className="card-pad" style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
         {rows === null && <div className="faint" style={{ fontSize: 13 }}>{tr('Set your filters above and click Run to preview results here.')}</div>}
 
-        <div>
-          <div className="muted" style={{ fontSize: 12, fontWeight: 600, letterSpacing: '0.03em', textTransform: 'uppercase', marginBottom: 10 }}>{tr('Fields to include')}</div>
-          <div className="row" style={{ gap: 10, flexWrap: 'wrap' }}>
-            {allFields.map(f => (
-              <label key={f} className="row" style={{
-                gap: 6, fontSize: 12.5, padding: '5px 10px', borderRadius: 6,
-                border: '1px solid var(--border)', background: fields[f] ? 'var(--accent-softer)' : 'var(--surface)',
-                cursor: 'pointer',
-              }}>
-                <input type="checkbox" checked={!!fields[f]} onChange={e => setFields(v => ({ ...v, [f]: e.target.checked }))} />
-                {f}
-              </label>
-            ))}
-          </div>
-        </div>
-
         {rows && (
-          <div className="row" style={{ justifyContent: 'space-between', paddingTop: 6, borderTop: '1px solid var(--border)' }}>
-            <span className="muted" style={{ fontSize: 13 }}><span className="mono" style={{ fontWeight: 600 }}>{rows.length}</span> {tr('invoices match')}</span>
-            <ExportButtons filename="invoices-export" data={rows.map(r => {
-              const out: Record<string, unknown> = {};
-              allFields.filter(f => fields[f]).forEach(f => { out[f] = r[f]; });
-              return out;
-            })} />
-          </div>
+          <>
+            <div className="row" style={{ justifyContent: 'space-between' }}>
+              <span className="muted" style={{ fontSize: 13 }}><span className="mono" style={{ fontWeight: 600 }}>{rows.length}</span> {tr('invoices match')}</span>
+              <ExportButtons filename="invoices-export" data={rows.map(r => {
+                const out: Record<string, unknown> = {};
+                allFields.forEach(f => { out[f] = r[f]; });
+                return out;
+              })} />
+            </div>
+            {rows.length > 0 && (
+              <table className="tbl">
+                <thead>
+                  <tr>{allFields.map(f => <th key={f}>{tr(f)}</th>)}</tr>
+                </thead>
+                <tbody>
+                  {rows.map(r => (
+                    <tr key={r.id}>
+                      {allFields.map(f => (
+                        <td key={f} className={f === 'total' ? 'right num' : undefined}>
+                          {f === 'total' ? fmtMoney(r.total) : String(r[f] ?? '—')}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </>
         )}
       </div>
     </div>

@@ -1,14 +1,13 @@
 'use client';
 
-import * as React from 'react';
 import { useEffect, useState } from 'react';
 import { I } from '@/components/icons';
-import { Badge, Avatar, Segmented, PageHeader, MiniStat, Pagination, usePagination } from '@/components/ui';
+import { Badge, Avatar, PageHeader, MiniStat, Pagination, usePagination } from '@/components/ui';
 import { fmtMoney } from '@/lib/utils';
 import { RelativeTime } from '@/components/RelativeTime';
 import { useToast } from '@/components/providers/ToastProvider';
 import {
-  WORKFLOWS, wfById, ACTION_TONE_VAR, ACTION_SOFT_VAR,
+  wfById, ACTION_TONE_VAR, ACTION_SOFT_VAR,
   type WFTask, type WFAction, type WFField, type WFBranch,
 } from '@/lib/workflow';
 import {
@@ -34,22 +33,21 @@ export function WorkflowsView({ initialInstances, initialOpen = null }: { initia
   const toast = useToast();
   const [instances, setInstances] = useState<WorkflowInstanceListItem[]>(initialInstances);
   const [open, setOpen] = useState<string | null>(initialOpen);
-  const [wfId, setWfId] = useState('stock');
 
   function refreshOne(updatedCode: string, patch: Partial<WorkflowInstanceListItem['instance']>) {
     setInstances(prev => prev.map(x => x.instance.code === updatedCode ? { ...x, instance: { ...x.instance, ...patch } } : x));
   }
 
-  const wf = wfById(wfId);
-  const tasks = wf.tasks;
   const statusTone: Record<string, string> = { 'In Progress': 'blue', 'Info Requested': 'amber', 'Declined': 'red', 'Completed': 'green', 'Pending Payment': 'teal', 'Order not placed via PD': 'gray' };
-  const wfInstances = instances.filter(i => i.instance.wf_id === wfId);
-  const active = wfInstances.filter(i => i.instance.status === 'In Progress' || i.instance.status === 'Info Requested');
-  const branch = tasks.find(t => t.auto)?.branch;
-  const resolved = wfInstances.filter(w => !['In Progress', 'Info Requested'].includes(w.instance.status));
+  // Every task-name/role lookup below goes through each instance's own
+  // wf_id — the three workflows (Stock / Non-Stock / Special) have
+  // different chains, so a combined list can't share one `tasks` array
+  // the way the old per-workflow pipeline board did.
+  const taskFor = (inst: WorkflowInstanceListItem['instance']) => wfById(inst.wf_id).tasks[inst.task_idx];
+  const active = instances.filter(i => i.instance.status === 'In Progress' || i.instance.status === 'Info Requested');
+  const resolved = instances.filter(w => !['In Progress', 'Info Requested'].includes(w.instance.status));
+  const activePagination = usePagination(active);
   const resolvedPagination = usePagination(resolved);
-  const { setPage: setResolvedPage } = resolvedPagination;
-  useEffect(() => { setResolvedPage(1); }, [wfId, setResolvedPage]);
 
   if (open) {
     return <WorkflowRunner code={open} onBack={() => setOpen(null)} toast={toast}
@@ -60,84 +58,60 @@ export function WorkflowsView({ initialInstances, initialOpen = null }: { initia
     <div className="view-enter">
       <PageHeader title={tr('Workflows')} sub={tr('Invoice approval workflows — track and action in-flight items.')} />
 
-      {/* Workflow switcher */}
-      <div style={{ marginBottom: 'var(--gap-5)' }}>
-        <Segmented options={WORKFLOWS.map(w => ({ value: w.id, label: tr(w.name) }))} value={wfId} onChange={(v) => setWfId(String(v))} />
-      </div>
-
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 'var(--gap-4)', marginBottom: 'var(--gap-5)' }}>
         <MiniStat label={tr('Active workflows')} value={active.length} sub={tr('in progress')} tone="blue" />
-        <MiniStat label={tr('In approval')} value={wfInstances.filter(i => i.instance.status === 'In Progress' && i.instance.task_idx > 0).length} tone="violet" />
-        <MiniStat label={tr('Info requested')} value={wfInstances.filter(i => i.instance.status === 'Info Requested').length} tone="amber" />
+        <MiniStat label={tr('In approval')} value={instances.filter(i => i.instance.status === 'In Progress' && i.instance.task_idx > 0).length} tone="violet" />
+        <MiniStat label={tr('Info requested')} value={instances.filter(i => i.instance.status === 'Info Requested').length} tone="amber" />
         <MiniStat label={tr('Total value in flight')} value={fmtMoney(active.reduce((s, i) => s + i.amount, 0))} tone="green" />
       </div>
 
-      {/* Pipeline board — one column per task, so a pile-up at any step is
-          visible at a glance instead of requiring a scan down a table's
-          "Current task" column. Each column header doubles as the workflow
-          definition strip (task name/role in chain order). */}
-      <div className="board-scroll" style={{ marginBottom: 'var(--gap-5)' }}>
-        <div className="board">
-          {tasks.map((t, i) => {
-            const items = wfInstances.filter(w => w.instance.task_idx === i && (w.instance.status === 'In Progress' || w.instance.status === 'Info Requested'));
-            const busy = items.length > 3;
-            const colTone = t.auto ? 'var(--violet)' : busy ? 'var(--amber)' : 'var(--accent)';
-            return (
-              <React.Fragment key={t.id}>
-                <div className={t.auto ? 'wf-col auto' : 'wf-col'} style={{ ['--col-tone' as string]: colTone }}>
-                  <div className="wf-col-head">
-                    <div className="wf-col-step">
-                      <div className="wf-col-num">{t.auto ? <I.zap size={11} /> : i + 1}</div>
-                      <div>
-                        <div className="wf-col-name">{tr(t.name)}</div>
-                        <div className="wf-col-role">{t.auto ? tr('System · auto') : tr(t.role)}</div>
-                      </div>
-                    </div>
-                    {!t.auto && <div className="wf-col-count">{items.length}</div>}
-                  </div>
-                  <div className="wf-stack">
-                    {items.map(({ instance: inst, invoiceCode, vendor, po, amount }) => (
-                      <div key={inst.id} className="wf-card" style={{ ['--card-tone' as string]: inst.status === 'Info Requested' ? 'var(--amber)' : 'var(--border-strong)' }}
-                        onClick={() => setOpen(inst.code)}>
-                        <div className="top">
-                          <span className="mono" style={{ fontSize: 11, fontWeight: 700, color: 'var(--accent-strong)' }}>{inst.code}</span>
-                          {inst.status === 'Info Requested' && <Badge tone="amber" dot>{tr('Info req.')}</Badge>}
-                        </div>
-                        <div className="vendor">{vendor}</div>
-                        <div className="amt">{fmtMoney(amount)}</div>
-                        <div className="meta">
-                          <span className="mono" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flexShrink: 1 }} title={`${invoiceCode}${po ? ` · ${po}` : ''}`}>
-                            {invoiceCode}{po ? ` · ${po}` : ''}
-                          </span>
-                          <RelativeTime date={new Date(inst.started_at)} />
-                        </div>
-                      </div>
-                    ))}
-                    {items.length === 0 && <div className="wf-col-empty">{tr('Empty')}</div>}
-                  </div>
-                </div>
-                {i < tasks.length - 1 && <div className="wf-col-arrow"><I.arrowR size={16} /></div>}
-              </React.Fragment>
-            );
-          })}
-        </div>
+      {/* Combined list — every in-flight invoice across all three
+          workflows in one table, since the workflows' task chains differ
+          in length and can't share one set of pipeline-board columns. */}
+      <div className="card" style={{ overflow: 'hidden', marginBottom: 'var(--gap-5)' }}>
+        <div className="card-head"><div className="card-title">{tr('Active')}</div><Badge tone="gray">{active.length}</Badge></div>
+        {active.length === 0 ? (
+          <div className="empty">{tr('No invoices in-flight.')}</div>
+        ) : (
+          <>
+            <table className="tbl">
+              <thead><tr><th>{tr('Invoice')}</th><th>{tr('Workflow')}</th><th>{tr('Current task')}</th><th>{tr('Vendor')}</th><th className="right">{tr('Amount')}</th><th>{tr('Status')}</th><th>{tr('Started')}</th></tr></thead>
+              <tbody>
+                {activePagination.pageItems.map(({ instance: inst, invoiceCode, vendor, po, amount }) => {
+                  const t = taskFor(inst);
+                  return (
+                    <tr key={inst.id} className="clickable" onClick={() => setOpen(inst.code)}>
+                      <td>
+                        <div className="mono" style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--accent-strong)' }}>{inst.code}</div>
+                        <div className="faint mono" style={{ fontSize: 11 }}>{invoiceCode} · {po || tr('No PO')}</div>
+                      </td>
+                      <td><Badge tone="gray">{tr(wfById(inst.wf_id).short)}</Badge></td>
+                      <td style={{ fontSize: 13 }}>
+                        {t ? tr(t.name) : '—'}
+                        {t?.auto && <span className="faint" style={{ marginLeft: 5 }}>({tr('auto')})</span>}
+                      </td>
+                      <td style={{ fontWeight: 500, fontSize: 13 }}>{vendor}</td>
+                      <td className="right num" style={{ fontWeight: 600 }}>{fmtMoney(amount)}</td>
+                      <td><Badge tone={statusTone[inst.status]} dot>{tr(inst.status)}</Badge></td>
+                      <td className="faint" style={{ fontSize: 12 }}><RelativeTime date={new Date(inst.started_at)} /></td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+            <Pagination page={activePagination.page} totalPages={activePagination.totalPages} onChange={activePagination.setPage} total={activePagination.total} pageSize={activePagination.pageSize} />
+          </>
+        )}
       </div>
-      {branch && (
-        <div className="row" style={{ gap: 8, marginBottom: 'var(--gap-5)', flexWrap: 'wrap' }}>
-          <span className="faint" style={{ fontSize: 11.5 }}>{tr('Amount check branch:')}</span>
-          <Badge tone="teal">&gt; €{branch.threshold} → {tr(branch.over)}</Badge>
-          <Badge tone="gray">≤ €{branch.threshold} → {tr(branch.under)} ({tr('skips')} {tr(tasks[branch.skipIdx].name)})</Badge>
-        </div>
-      )}
 
       {/* Terminal instances (declined / completed / etc.) don't sit at a
-          task anymore, so they don't belong on the board — kept as a
-          compact list underneath instead of being lost. */}
+          task anymore — kept as a compact list underneath instead of being
+          lost, combined across all three workflows the same way. */}
       {resolved.length > 0 && (
         <div className="card" style={{ overflow: 'hidden' }}>
           <div className="card-head"><div className="card-title">{tr('Recently resolved')}</div><Badge tone="gray">{resolved.length}</Badge></div>
           <table className="tbl">
-            <thead><tr><th>{tr('Workflow')}</th><th>{tr('Vendor')}</th><th className="right">{tr('Amount')}</th><th>{tr('Status')}</th><th>{tr('Started')}</th><th style={{ width: 40 }}></th></tr></thead>
+            <thead><tr><th>{tr('Invoice')}</th><th>{tr('Workflow')}</th><th>{tr('Vendor')}</th><th className="right">{tr('Amount')}</th><th>{tr('Status')}</th><th>{tr('Started')}</th><th style={{ width: 40 }}></th></tr></thead>
             <tbody>
               {resolvedPagination.pageItems.map(({ instance: inst, invoiceCode, vendor, po, amount }) => (
                 <tr key={inst.id} className="clickable" onClick={() => setOpen(inst.code)}>
@@ -145,6 +119,7 @@ export function WorkflowsView({ initialInstances, initialOpen = null }: { initia
                     <div className="mono" style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--accent-strong)' }}>{inst.code}</div>
                     <div className="faint mono" style={{ fontSize: 11 }}>{invoiceCode} · {po || tr('No PO')}</div>
                   </td>
+                  <td><Badge tone="gray">{tr(wfById(inst.wf_id).short)}</Badge></td>
                   <td style={{ fontWeight: 500, fontSize: 13 }}>{vendor}</td>
                   <td className="right num" style={{ fontWeight: 600 }}>{fmtMoney(amount)}</td>
                   <td><Badge tone={statusTone[inst.status]} dot>{tr(inst.status)}</Badge></td>
@@ -521,7 +496,7 @@ function WFFieldEl({ f, value, onChange, invoice, approvers }: {
         </select>
       ) : f.type === 'currency' ? (
         <div style={{ position: 'relative' }}>
-          <span style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', color: 'var(--muted)', fontSize: 13, fontFamily: 'var(--mono)' }}>€</span>
+          <span style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', color: 'var(--muted)', fontSize: 13, fontFamily: 'var(--mono)' }}>R</span>
           <input className="input mono" style={{ paddingLeft: 24, textAlign: 'right' }} value={value ?? ''} onChange={e => onChange(e.target.value.replace(/[^0-9.]/g, ''))} />
         </div>
       ) : (

@@ -75,7 +75,7 @@ export function WorkflowsView({ initialInstances, initialOpen = null }: { initia
         ) : (
           <>
             <table className="tbl">
-              <thead><tr><th>{tr('Invoice')}</th><th>{tr('Workflow')}</th><th>{tr('Current task')}</th><th>{tr('Vendor')}</th><th className="right">{tr('Amount')}</th><th>{tr('Status')}</th><th>{tr('Started')}</th></tr></thead>
+              <thead><tr><th>{tr('Invoice')}</th><th>{tr('Current task')}</th><th>{tr('Vendor')}</th><th className="right">{tr('Amount')}</th><th>{tr('Status')}</th><th>{tr('Started')}</th></tr></thead>
               <tbody>
                 {activePagination.pageItems.map(({ instance: inst, invoiceCode, vendor, po, amount }) => {
                   const t = taskFor(inst);
@@ -85,7 +85,6 @@ export function WorkflowsView({ initialInstances, initialOpen = null }: { initia
                         <div className="mono" style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--accent-strong)' }}>{inst.code}</div>
                         <div className="faint mono" style={{ fontSize: 11 }}>{invoiceCode} · {po || tr('No PO')}</div>
                       </td>
-                      <td><Badge tone="gray">{tr(wfById(inst.wf_id).short)}</Badge></td>
                       <td style={{ fontSize: 13 }}>
                         {t ? tr(t.name) : '—'}
                         {t?.auto && <span className="faint" style={{ marginLeft: 5 }}>({tr('auto')})</span>}
@@ -111,7 +110,7 @@ export function WorkflowsView({ initialInstances, initialOpen = null }: { initia
         <div className="card" style={{ overflow: 'hidden' }}>
           <div className="card-head"><div className="card-title">{tr('Recently resolved')}</div><Badge tone="gray">{resolved.length}</Badge></div>
           <table className="tbl">
-            <thead><tr><th>{tr('Invoice')}</th><th>{tr('Workflow')}</th><th>{tr('Vendor')}</th><th className="right">{tr('Amount')}</th><th>{tr('Status')}</th><th>{tr('Started')}</th><th style={{ width: 40 }}></th></tr></thead>
+            <thead><tr><th>{tr('Invoice')}</th><th>{tr('Vendor')}</th><th className="right">{tr('Amount')}</th><th>{tr('Status')}</th><th>{tr('Started')}</th><th style={{ width: 40 }}></th></tr></thead>
             <tbody>
               {resolvedPagination.pageItems.map(({ instance: inst, invoiceCode, vendor, po, amount }) => (
                 <tr key={inst.id} className="clickable" onClick={() => setOpen(inst.code)}>
@@ -119,7 +118,6 @@ export function WorkflowsView({ initialInstances, initialOpen = null }: { initia
                     <div className="mono" style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--accent-strong)' }}>{inst.code}</div>
                     <div className="faint mono" style={{ fontSize: 11 }}>{invoiceCode} · {po || tr('No PO')}</div>
                   </td>
-                  <td><Badge tone="gray">{tr(wfById(inst.wf_id).short)}</Badge></td>
                   <td style={{ fontWeight: 500, fontSize: 13 }}>{vendor}</td>
                   <td className="right num" style={{ fontWeight: 600 }}>{fmtMoney(amount)}</td>
                   <td><Badge tone={statusTone[inst.status]} dot>{tr(inst.status)}</Badge></td>

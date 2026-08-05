@@ -19,8 +19,6 @@ import { getMyDelegation, setMyDelegation, clearMyDelegation } from '@/lib/serve
 import { errorMessage } from '@/lib/errorMessage';
 import type { AppUserRow, InvoiceRow } from '@/lib/supabase/types';
 import { useTr } from '@/lib/i18n';
-import Image from 'next/image';
-
 
 interface NavItem { key: string; label: string; icon: IconComponent; count?: number }
 interface NavGroup { section: string; items: NavItem[] }
@@ -88,11 +86,11 @@ export function AppShell({ children, unreadCount, accessibleModules }: { childre
       {/* SIDEBAR */}
       <aside className="sidebar">
         <div className="brand">
-          <Image src="/images/Mindrift_Logo.jpg" alt="MindRift" width={52} height={38} style={{ objectFit: 'contain' }} />
-<div style={{ marginLeft: 6 }}>
-  <div className="brand-name">PCG | MindRift</div>
-  <div className="brand-sub">{tr('Workflow Portal')}</div>
-</div>
+          <div className="brand-mark">P</div>
+          <div>
+            <div className="brand-name">Photiades</div>
+            <div className="brand-sub">{tr('Workflow Portal')}</div>
+          </div>
         </div>
         <nav className="nav">
           {visibleNav.map(grp => (
@@ -133,10 +131,6 @@ export function AppShell({ children, unreadCount, accessibleModules }: { childre
           </div>
           <div className="spacer" />
           <TopbarSearch />
-          <div className="seg" style={{ marginRight: 2 }} title={tr('Language')}>
-            <button className={cx(t.lang !== 'el' && 'on')} onClick={() => setTweak('lang', 'en')}>EN</button>
-            <button className={cx(t.lang === 'el' && 'on')} onClick={() => setTweak('lang', 'el')}>ΕΛ</button>
-          </div>
           <IconBtn icon={t.dark ? I.sun : I.moon} onClick={() => setTweak('dark', !t.dark)} title={tr('Toggle theme')} />
           <IconBtn icon={I.bell} badge={unreadCount > 0} onClick={() => router.push('/notifications')} title={tr('Notifications')} />
           <div style={{ width: 1, height: 26, background: 'var(--border)', margin: '0 4px' }} />

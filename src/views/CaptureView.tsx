@@ -155,7 +155,7 @@ export function CaptureView() {
   const go = useGo();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const nextId = useRef(0);
-  const uploadKindRef = useRef<CapKind>('standard');
+  const uploadKindRef = useRef<CapKind>('special');
   const [docs, setDocs] = useState<CapDoc[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [activeField, setActiveField] = useState<string | null>(null);
@@ -412,13 +412,13 @@ export function CaptureView() {
           </div>
         )}
 
-        {/* Two blocks — Standard vs Special Invoice — since they capture a
-            different field set (Special has its own Document Number and a
-            Material Code table instead of Line Items). */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--gap-5)' }}>
+        {/* Single dropzone — Standard Invoice was removed from the demo;
+            "Invoice" here is internally still the former Special Invoice
+            flow (its own Document Number field and a Material Code table
+            instead of Line Items). */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 'var(--gap-5)' }}>
           {([
-            { kind: 'standard' as const, title: tr('Standard Invoice'), desc: tr('The regular invoice flow — Description, Qty, Unit Price, GL Code line items.') },
-            { kind: 'special' as const, title: tr('Special Invoice'), desc: tr('Adds a Document Number field, and a Material Code table (Item, Material, UOM) instead of line items.') },
+            { kind: 'special' as const, title: tr('Invoice'), desc: tr('Upload an invoice — Document Number and a Material Code table (Item, Material, UOM) are captured automatically.') },
           ]).map(({ kind, title, desc }) => (
             <div key={kind}
               onDragOver={(e) => { e.preventDefault(); setDragKind(kind); }}
@@ -546,7 +546,7 @@ export function CaptureView() {
         <div className="cap-form">
           {kind === 'special' ? (
             <>
-              <CapField label={tr('Document Type')}><CapInput value={tr('Special Invoice')} readOnly /></CapField>
+              <CapField label={tr('Document Type')}><CapInput value={tr('Invoice')} readOnly /></CapField>
               <CapField label={tr('Status')}><CapInput value={form.status} readOnly /></CapField>
               <CapField label={tr('Invoice Code')}><CapInput value={active.code} readOnly /></CapField>
 

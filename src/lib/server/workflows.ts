@@ -293,14 +293,6 @@ export async function advanceWorkflowTask(instanceId: string, actionKey: string,
         instancePatch = { status: 'Completed' };
         invoicePatch.status = 'Paid Invoice';
         break;
-      case 'reassignReqner': {
-        // Special Invoice's Req/ner-Approval "Send to Req/ner" — reassigns
-        // to a different requisitioner without moving off this task or
-        // pausing for a separate grant/decline step (unlike 'additional').
-        const approver = await findAppUserByName(String(fields.approver || ''));
-        instancePatch = { assignee_id: approver?.id ?? null };
-        break;
-      }
       case 'requestInfo': {
         // Sends the task back to whoever handled the immediately preceding
         // human task. For a strictly linear chain that's just the previous

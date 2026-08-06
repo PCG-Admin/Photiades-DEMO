@@ -45,9 +45,7 @@ export function WorkflowsView({ initialInstances, initialOpen = null }: { initia
   // the way the old per-workflow pipeline board did.
   const taskFor = (inst: WorkflowInstanceListItem['instance']) => wfById(inst.wf_id).tasks[inst.task_idx];
   const active = instances.filter(i => i.instance.status === 'In Progress' || i.instance.status === 'Info Requested');
-  const resolved = instances.filter(w => !['In Progress', 'Info Requested'].includes(w.instance.status));
   const activePagination = usePagination(active);
-  const resolvedPagination = usePagination(resolved);
 
   if (open) {
     return <WorkflowRunner code={open} onBack={() => setOpen(null)} toast={toast}
@@ -102,34 +100,6 @@ export function WorkflowsView({ initialInstances, initialOpen = null }: { initia
           </>
         )}
       </div>
-
-      {/* Terminal instances (declined / completed / etc.) don't sit at a
-          task anymore — kept as a compact list underneath instead of being
-          lost, combined across all three workflows the same way. */}
-      {resolved.length > 0 && (
-        <div className="card" style={{ overflow: 'hidden' }}>
-          <div className="card-head"><div className="card-title">{tr('Recently resolved')}</div><Badge tone="gray">{resolved.length}</Badge></div>
-          <table className="tbl">
-            <thead><tr><th>{tr('Invoice')}</th><th>{tr('Vendor')}</th><th className="right">{tr('Amount')}</th><th>{tr('Status')}</th><th>{tr('Started')}</th><th style={{ width: 40 }}></th></tr></thead>
-            <tbody>
-              {resolvedPagination.pageItems.map(({ instance: inst, invoiceCode, vendor, po, amount }) => (
-                <tr key={inst.id} className="clickable" onClick={() => setOpen(inst.code)}>
-                  <td>
-                    <div className="mono" style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--accent-strong)' }}>{inst.code}</div>
-                    <div className="faint mono" style={{ fontSize: 11 }}>{invoiceCode} · {po || tr('No PO')}</div>
-                  </td>
-                  <td style={{ fontWeight: 500, fontSize: 13 }}>{vendor}</td>
-                  <td className="right num" style={{ fontWeight: 600 }}>{fmtMoney(amount)}</td>
-                  <td><Badge tone={statusTone[inst.status]} dot>{tr(inst.status)}</Badge></td>
-                  <td className="faint" style={{ fontSize: 12 }}><RelativeTime date={new Date(inst.started_at)} /></td>
-                  <td><I.chevR size={16} style={{ color: 'var(--faint)' }} /></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          <Pagination page={resolvedPagination.page} totalPages={resolvedPagination.totalPages} onChange={resolvedPagination.setPage} total={resolvedPagination.total} pageSize={resolvedPagination.pageSize} />
-        </div>
-      )}
     </div>
   );
 }

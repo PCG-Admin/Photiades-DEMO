@@ -59,8 +59,8 @@ export function InvoicesView({ initialInvoices, initialId = null }: { initialInv
   // advanceWorkflowTask) — 'In Review'/'Exception'/'At AcDep'/'Processing'
   // are defined in the DB check constraint but no code path ever sets them,
   // so a tab for them would always show 0 and never populate.
-  const tabs = ['All', 'Awaiting Approval', 'Pend. Pmt', 'Orders not placed by PD', 'Approved', 'Paid Invoice', 'Declined'];
-  const tabStatus: Record<string, string> = { 'Pend. Pmt': 'Pending Payment', 'Orders not placed by PD': 'Order not placed via PD' };
+  const tabs = ['All', 'Pend. Pmt', 'Paid Invoice', 'Declined'];
+  const tabStatus: Record<string, string> = { 'Pend. Pmt': 'Pending Payment' };
   const statusFor = (t: string) => tabStatus[t] || t;
   const tabCount = (t: string) => t === 'All' ? invoices.length : invoices.filter(i => i.status === statusFor(t)).length;
 

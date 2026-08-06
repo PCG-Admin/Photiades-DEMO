@@ -359,24 +359,12 @@ export const WF_NONSTOCK_TASKS: WFTask[] = [
 // has no separate AP Clerk "imported" task — it starts directly with
 // Accounts Department review.
 //
-// This is a genuine branching graph, not a straight line — AcDep-Check can
-// send the invoice to either Req/ner-Approval or straight to AcMgr-Approval,
-// and AcMgr-Approval can detour through a Special Approval side task before
-// continuing. Every non-adjacent jump uses an explicit `toTaskId` (see
-// WFAction) rather than relying on array-position math, since that math
-// only holds for a strictly linear chain like Stock/Non-Stock.
-//
-// "Com when stored" showed up as a read-only field on Req/ner-Approval,
-// AcMgr-Approval, and Special Approval in the source spec — recalling a
-// specific *other* task's stored comment isn't something the engine can
-// currently do (WFField's `ro` type only reads live invoice fields like
-// amount/po, not another task's history), so those were left out rather
-// than shown as a misleadingly-blank read-only box. Flagged for follow-up
-// if that recall is actually needed.
+// This workflow goes: AcDep-Check → AcMgr-Approval → (Special Approval or 
+// Approve or Request Info) → AcDep-Approval → (Paid or Pend. Pmt) → AcDep-PendPmt
 export const WF_SPECIAL_TASKS: WFTask[] = [
   {
     id: 'sp1', name: 'AcDep-Check', role: 'Accounts Department', stage: 'Review',
-    desc: 'Accounts Department reviews the special invoice and routes it to the requisitioner or straight to the Accounts Manager.',
+    desc: 'Accounts Department reviews the special invoice and routes it to the Accounts Manager.',
     actions: [
       { key: 'sendToAcMgr', label: 'Send to AcMgr', tone: 'blue', icon: 'arrowR', toTaskId: 'sp3',
         fields: [
@@ -384,16 +372,6 @@ export const WF_SPECIAL_TASKS: WFTask[] = [
           { k: 'po', label: 'PO Number', type: 'ro', src: 'po' },
           { k: 'amount', label: 'Amount', type: 'ro-currency', src: 'amount' },
           { k: 'nonStkDoc', label: 'Document Number', type: 'text' },
-          { k: 'comStored', label: 'Comment when stored', type: 'textarea' },
-          { k: 'com', label: 'Comment', type: 'textarea' },
-        ] },
-      { key: 'sendToReqner', label: 'Send to Req/ner', tone: 'blue', icon: 'arrowR', toTaskId: 'sp2',
-        fields: [
-          { k: 'invNo', label: 'Invoice Number', type: 'ro', src: 'invNo' },
-          { k: 'po', label: 'PO Number', type: 'ro', src: 'po' },
-          { k: 'amount', label: 'Amount', type: 'ro-currency', src: 'amount' },
-          { k: 'nonStkDoc', label: 'Document Number', type: 'text' },
-          { k: 'comStored', label: 'Comment when stored', type: 'textarea' },
           { k: 'com', label: 'Comment', type: 'textarea' },
         ] },
       { key: 'sendPendPmt', label: 'Pend. Pmt', tone: 'teal', icon: 'clock', toTaskId: 'sp5',
@@ -402,30 +380,6 @@ export const WF_SPECIAL_TASKS: WFTask[] = [
           { k: 'po', label: 'PO Number', type: 'ro', src: 'po' },
           { k: 'amount', label: 'Amount', type: 'ro-currency', src: 'amount' },
           { k: 'nonStkDoc', label: 'Document Number', type: 'text' },
-          { k: 'comStored', label: 'Comment when stored', type: 'textarea' },
-          { k: 'com', label: 'Comment', type: 'textarea' },
-        ] },
-      { key: 'declined', label: 'Declined', tone: 'red', icon: 'x',
-        fields: [{ k: 'com', label: 'Comment', type: 'textarea', required: true }] },
-    ],
-  },
-  {
-    id: 'sp2', name: 'Req/ner-Approval', role: 'Requisitioner', stage: 'Approval',
-    desc: 'The requisitioner reviews the special invoice and sends it on to the Accounts Manager, or hands it to a different requisitioner.',
-    actions: [
-      { key: 'sentToAcMgr', label: 'Sent to AcMgr', tone: 'green', icon: 'arrowR', toTaskId: 'sp3',
-        fields: [
-          { k: 'invNo', label: 'Invoice Number', type: 'ro', src: 'invNo' },
-          { k: 'po', label: 'PO Number', type: 'ro', src: 'po' },
-          { k: 'amount', label: 'Amount', type: 'ro-currency', src: 'amount' },
-          { k: 'com', label: 'Comment', type: 'textarea' },
-        ] },
-      { key: 'reassignReqner', label: 'Send to Req/ner', tone: 'violet', icon: 'users',
-        fields: [
-          { k: 'approver', label: 'Send to Req/ner', type: 'select', options: [], required: true },
-          { k: 'invNo', label: 'Invoice Number', type: 'ro', src: 'invNo' },
-          { k: 'po', label: 'PO Number', type: 'ro', src: 'po' },
-          { k: 'amount', label: 'Amount', type: 'ro-currency', src: 'amount' },
           { k: 'com', label: 'Comment', type: 'textarea' },
         ] },
       { key: 'declined', label: 'Declined', tone: 'red', icon: 'x',
@@ -451,7 +405,7 @@ export const WF_SPECIAL_TASKS: WFTask[] = [
           { k: 'amount', label: 'Amount', type: 'ro-currency', src: 'amount' },
           { k: 'com', label: 'Comment', type: 'textarea' },
         ] },
-      { key: 'requestInfo', label: 'Request Info', tone: 'amber', icon: 'refresh', toTaskId: 'sp2',
+      { key: 'requestInfo', label: 'Request Info', tone: 'amber', icon: 'refresh', toTaskId: 'sp1',
         fields: [
           { k: 'invNo', label: 'Invoice Number', type: 'ro', src: 'invNo' },
           { k: 'po', label: 'PO Number', type: 'ro', src: 'po' },
@@ -473,7 +427,7 @@ export const WF_SPECIAL_TASKS: WFTask[] = [
           { k: 'amount', label: 'Amount', type: 'ro-currency', src: 'amount' },
           { k: 'com', label: 'Comment', type: 'textarea' },
         ] },
-      { key: 'requestInfo', label: 'Request Info', tone: 'amber', icon: 'refresh', toTaskId: 'sp2',
+      { key: 'requestInfo', label: 'Request Info', tone: 'amber', icon: 'refresh', toTaskId: 'sp1',
         fields: [
           { k: 'invNo', label: 'Invoice Number', type: 'ro', src: 'invNo' },
           { k: 'po', label: 'PO Number', type: 'ro', src: 'po' },

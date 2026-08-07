@@ -359,29 +359,7 @@ export const WF_SPECIAL_TASKS: WFTask[] = [
         fields: [{ k: 'com', label: 'Comment', type: 'textarea', required: true }] },
     ],
   },
-  {
-    id: 'sp4', name: 'Accounts Department Approval', role: 'Accounts Department', stage: 'Approval',
-    desc: 'Accounts Department final approval — mark approved, hold for the next payment run, or send back for more information.',
-    actions: [
-      { key: 'paidDirect', label: 'Approve', tone: 'green', icon: 'check',
-        fields: [
-          { k: 'invNo', label: 'Invoice Number', type: 'ro', src: 'invNo' },
-          { k: 'po', label: 'PO Number', type: 'ro', src: 'po' },
-          { k: 'amount', label: 'Amount', type: 'ro-currency', src: 'amount' },
-          { k: 'com', label: 'Comment', type: 'textarea' },
-        ] },
-      { key: 'requestInfo', label: 'Request Info', tone: 'amber', icon: 'refresh', toTaskId: 'sp3',
-        fields: [
-          { k: 'invNo', label: 'Invoice Number', type: 'ro', src: 'invNo' },
-          { k: 'po', label: 'PO Number', type: 'ro', src: 'po' },
-          { k: 'amount', label: 'Amount', type: 'ro-currency', src: 'amount' },
-          { k: 'com', label: 'Comment', type: 'textarea', required: true },
-        ] },
-      
-      { key: 'declined', label: 'Decline', tone: 'red', icon: 'x',
-        fields: [{ k: 'com', label: 'Comment', type: 'textarea', required: true }] },
-    ],
-  },
+  
   {
     id: 'sp5', name: 'Accounts Department Payment', role: 'Accounts Department', stage: 'Approval',
     desc: 'Held pending payment — mark paid once released, or decline.',

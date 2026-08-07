@@ -59,8 +59,46 @@ export async function getApprovalSLA(since?: string | null): Promise<SlaRow[]> {
     prev = row;
   }
 
-  return Array.from(durationsByTask.entries())
-    .map(([taskName, hours]) => ({ taskName, avgHours: hours.reduce((a, b) => a + b, 0) / hours.length, count: hours.length }))
+  // 1. Map to display names first
+  const mappedRows = Array.from(durationsByTask.entries())
+    .map(([taskName, hours]) => {
+      let displayName = taskName;
+      if (taskName === 'AcDep-Check') displayName = 'Accounts Department Check';
+      if (taskName === 'AcMgr-Approval') displayName = 'Accounts Manager Check';
+
+      return { 
+        taskName: displayName, 
+        avgHours: hours.reduce((a, b) => a + b, 0) / hours.length, 
+        count: hours.length 
+      };
+    });
+
+  // 2. Aggregate duplicates by taskName (Fix the duplicate keys error)
+  const aggregatedMap = new Map<string, { totalHours: number; totalCount: number }>();
+  for (const row of mappedRows) {
+    const existing = aggregatedMap.get(row.taskName);
+    if (existing) {
+      // Weighted average: (avg1 * count1 + avg2 * count2) / (count1 + count2)
+      const combinedAvg = ((existing.totalHours * existing.totalCount) + (row.avgHours * row.count)) / (existing.totalCount + row.count);
+      aggregatedMap.set(row.taskName, { 
+        totalHours: combinedAvg, 
+        totalCount: existing.totalCount + row.count 
+      });
+    } else {
+      aggregatedMap.set(row.taskName, { 
+        totalHours: row.avgHours, 
+        totalCount: row.count 
+      });
+    }
+  }
+
+  // 3. Convert back to array and sort
+  return Array.from(aggregatedMap.entries())
+    .map(([taskName, data]) => ({ 
+      taskName, 
+      avgHours: data.totalHours, 
+      count: data.totalCount 
+    }))
     .sort((a, b) => b.avgHours - a.avgHours);
 }
 
@@ -115,9 +153,18 @@ export async function getDeclinedTrend(since?: string | null): Promise<DeclinedR
     const instance = instances?.find(i => i.id === h.instance_id);
     const invoice = invoices?.find(inv => inv.id === instance?.invoice_id);
     const fields = typeof h.fields === 'object' && h.fields !== null ? h.fields as Record<string, unknown> : {};
+    
+    let displayName = h.task_name;
+    if (displayName === 'AcDep-Check') displayName = 'Accounts Department Check';
+    if (displayName === 'AcMgr-Approval') displayName = 'Accounts Manager Check';
+
     return {
-      code: invoice?.code ?? '—', vendor: invoice?.vendor ?? '—', amount: invoice?.total ?? 0,
-      taskName: h.task_name, reason: typeof fields.com === 'string' ? fields.com : '', when: h.occurred_at,
+      code: invoice?.code ?? '—', 
+      vendor: invoice?.vendor ?? '—', 
+      amount: invoice?.total ?? 0,
+      taskName: displayName,
+      reason: typeof fields.com === 'string' ? fields.com : '', 
+      when: h.occurred_at,
     };
   });
 }

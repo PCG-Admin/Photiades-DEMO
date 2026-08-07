@@ -144,13 +144,13 @@ function ColumnChart({ items, valueFmt = (v: number) => String(v) }: {
           ))}
         </div>
         <div style={{ display: 'flex', flex: 1, gap: 10 }}>
-          {items.map(item => {
+          {items.map((item, index) => {
             // A genuine 0 renders as no visible bar at all — a forced
             // minimum height previously drew a confusing little sliver that
             // looked like a rendering glitch for zero-value categories.
             const pct = item.value > 0 ? Math.max(1.5, (item.value / max) * 100) : 0;
             return (
-              <div key={item.label} style={{ flex: 1, minWidth: MIN_COL_W - 10, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+              <div key={`${item.label}-${index}`} style={{ flex: 1, minWidth: MIN_COL_W - 10, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                 <div style={{ fontSize: 12, fontWeight: 700, fontFamily: 'var(--mono)', marginBottom: 6, whiteSpace: 'nowrap' }}>{item.displayValue}</div>
                 <div style={{ height: TRACK_H, width: '100%', display: 'flex', alignItems: 'flex-end', borderLeft: '1px solid var(--border)', position: 'relative' }}>
                   {gridFracs.slice(1).map(f => (

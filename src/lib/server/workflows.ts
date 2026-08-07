@@ -70,7 +70,7 @@ export async function createWorkflowInstance(invoiceId: string, wfId: WorkflowIn
 }
 
 /** Approvals-inbox row shape — the Approvals view stays derived from
- * workflow_instances + the in-code WFTask role for the instance's current
+ * invoice_workflow_instances + the in-code WFTask role for the instance's current
  * task, never from a separate table (see plan decision #4). */
 export interface ApprovalInboxItem {
   instance: WorkflowInstanceRow;
@@ -249,8 +249,15 @@ export async function advanceWorkflowTask(instanceId: string, actionKey: string,
     // Doc numbers are captured on whichever outcome carries them (Stock/
     // Non-Stock's final approval and pending-payment steps, Special
     // Invoice's several) — applied generically rather than per-case.
-    if (fields.stkDoc) invoicePatch.stock_doc_number = String(fields.stkDoc);
-    if (fields.nonStkDoc) invoicePatch.non_stock_doc_number = String(fields.nonStkDoc);
+    // The task form only shows one merged "Document Number" field now
+    // (some tasks key it 'stkDoc', others 'nonStkDoc' internally), but we
+    // still write it to both columns so anything reading either one
+    // (e.g. Invoice Processing's edit form) sees the same value.
+    const docNumber = fields.stkDoc ?? fields.nonStkDoc;
+    if (docNumber) {
+      invoicePatch.stock_doc_number = String(docNumber);
+      invoicePatch.non_stock_doc_number = String(docNumber);
+    }
 
     switch (action.key) {
       case 'declined':
@@ -286,14 +293,6 @@ export async function advanceWorkflowTask(instanceId: string, actionKey: string,
         instancePatch = { status: 'Completed' };
         invoicePatch.status = 'Paid Invoice';
         break;
-      case 'reassignReqner': {
-        // Special Invoice's Req/ner-Approval "Send to Req/ner" — reassigns
-        // to a different requisitioner without moving off this task or
-        // pausing for a separate grant/decline step (unlike 'additional').
-        const approver = await findAppUserByName(String(fields.approver || ''));
-        instancePatch = { assignee_id: approver?.id ?? null };
-        break;
-      }
       case 'requestInfo': {
         // Sends the task back to whoever handled the immediately preceding
         // human task. For a strictly linear chain that's just the previous
@@ -392,7 +391,7 @@ export async function advanceWorkflowTask(instanceId: string, actionKey: string,
 }
 
 /** Approvals inbox (SOW's Approvals view, decision #4) — derived from
- * workflow_instances whose current task's role matches the caller's role;
+ * invoice_workflow_instances whose current task's role matches the caller's role;
  * never a separate table. */
 export async function getApprovalsInbox(userRole: string, userId: string): Promise<ApprovalInboxItem[]> {
   // 'Info Requested' surfaces here too — requestInfo reassigns the task

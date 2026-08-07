@@ -3,6 +3,7 @@
 import * as React from 'react';
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { I, IconComponent } from '@/components/icons';
 import { Avatar, IconBtn, Modal, StatusBadge } from '@/components/ui';
@@ -86,9 +87,9 @@ export function AppShell({ children, unreadCount, accessibleModules }: { childre
       {/* SIDEBAR */}
       <aside className="sidebar">
         <div className="brand">
-          <div className="brand-mark">P</div>
-          <div>
-            <div className="brand-name">Photiades</div>
+          <Image src="/images/Mindrift_Logo-02.png" alt="MindRift" width={56} height={41} style={{ objectFit: 'contain' }} />
+          <div style={{ marginLeft: 6 }}>
+            <div className="brand-name">PCG | MindRift</div>
             <div className="brand-sub">{tr('Workflow Portal')}</div>
           </div>
         </div>
@@ -109,16 +110,6 @@ export function AppShell({ children, unreadCount, accessibleModules }: { childre
             </div>
           ))}
         </nav>
-        <div className="sidebar-foot">
-          <div className="card" style={{ padding: 13, background: 'var(--accent-softer)', border: '1px solid var(--accent-soft)' }}>
-            <div className="row" style={{ gap: 9, marginBottom: 6 }}>
-              <div style={{ width: 26, height: 26, borderRadius: 7, background: 'var(--accent)', color: 'var(--on-accent)', display: 'grid', placeItems: 'center' }}><I.zap size={14} /></div>
-              <span style={{ fontSize: 12.5, fontWeight: 600 }}>{tr('Storage')}</span>
-            </div>
-            <div className="progress" style={{ margin: '8px 0 6px' }}><span style={{ width: '64%' }} /></div>
-            <div className="faint" style={{ fontSize: 11 }}>{tr('64% of 2 TB · 1.28 TB used')}</div>
-          </div>
-        </div>
       </aside>
 
       {/* MAIN */}

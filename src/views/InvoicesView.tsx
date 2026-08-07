@@ -12,7 +12,7 @@ import { DocumentHighlightPreview } from '@/components/DocumentHighlightPreview'
 import { cx, fmtMoney } from '@/lib/utils';
 import { fmtDateShort } from '@/lib/format';
 import { RelativeTime } from '@/components/RelativeTime';
-import { STOCK_TYPES, nonStockDocOptions } from '@/lib/constants';
+import { STOCK_TYPES } from '@/lib/constants';
 import { useToast } from '@/components/providers/ToastProvider';
 import { useGo } from '@/lib/navigation';
 import { useTr } from '@/lib/i18n';
@@ -59,8 +59,8 @@ export function InvoicesView({ initialInvoices, initialId = null }: { initialInv
   // advanceWorkflowTask) — 'In Review'/'Exception'/'At AcDep'/'Processing'
   // are defined in the DB check constraint but no code path ever sets them,
   // so a tab for them would always show 0 and never populate.
-  const tabs = ['All', 'Awaiting Approval', 'Pend. Pmt', 'Orders not placed by PD', 'Approved', 'Paid Invoice', 'Declined'];
-  const tabStatus: Record<string, string> = { 'Pend. Pmt': 'Pending Payment', 'Orders not placed by PD': 'Order not placed via PD' };
+  const tabs = ['All', 'Pend. Pmt', 'Paid Invoice', 'Declined'];
+  const tabStatus: Record<string, string> = { 'Pend. Pmt': 'Pending Payment' };
   const statusFor = (t: string) => tabStatus[t] || t;
   const tabCount = (t: string) => t === 'All' ? invoices.length : invoices.filter(i => i.status === statusFor(t)).length;
 
@@ -441,8 +441,10 @@ function InvoiceForm({ inv, hoverField, setHoverField, onSave, toast }: {
     invoiceNumber: inv.invoice_no,
     vendorRef: inv.vendor_ref,
     stockType: inv.stock_type ?? '',
-    stockDocNumber: inv.stock_doc_number ?? '',
-    nonStockDocNumber: inv.non_stock_doc_number ?? '',
+    // Merged into one displayed field — prefer whichever column has a
+    // value (older records may only have one populated).
+    stockDocNumber: inv.stock_doc_number ?? inv.non_stock_doc_number ?? '',
+    nonStockDocNumber: inv.stock_doc_number ?? inv.non_stock_doc_number ?? '',
   }), [inv]);
 
   // Reset is handled by remount (key={inv.id} at the call site).
@@ -539,18 +541,9 @@ function InvoiceForm({ inv, hoverField, setHoverField, onSave, toast }: {
           </select>
         </FF>
 
-        {form.stockType !== 'Non-stock' && (
-          <FF label={tr('Stock Document Number')} hoverField={hoverField} setHoverField={setHoverField} span2={form.stockType !== 'Stock & Non Stock'}>
-            <input type="text" className="input mono" placeholder="e.g. MIGO-490000" value={form.stockDocNumber} onChange={e => set('stockDocNumber', e.target.value)} />
-          </FF>
-        )}
-        {form.stockType !== 'Stock' && (
-          <FF label={tr('Non-Stock Document Number')} hoverField={hoverField} setHoverField={setHoverField} span2={form.stockType !== 'Stock & Non Stock'}>
-            <select className="input mono" value={form.nonStockDocNumber} onChange={e => set('nonStockDocNumber', e.target.value)}>
-              {nonStockDocOptions(form.nonStockDocNumber).map(o => <option key={o} value={o}>{o || tr('— Select —')}</option>)}
-            </select>
-          </FF>
-        )}
+        <FF label={tr('Document Number')} hoverField={hoverField} setHoverField={setHoverField} span2>
+          <input type="text" className="input mono" placeholder="e.g. MIGO-490000" value={form.stockDocNumber} onChange={e => { set('stockDocNumber', e.target.value); set('nonStockDocNumber', e.target.value); }} />
+        </FF>
       </div>
     </div>
   );

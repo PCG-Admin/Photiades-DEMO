@@ -15,7 +15,7 @@ import { genInvoiceCode } from '@/lib/server/codes';
 import { DocumentHighlightPreview } from '@/components/DocumentHighlightPreview';
 import { sha256Hex } from '@/lib/hash';
 import { ACCEPTED_UPLOAD_TYPES, ACCEPTED_UPLOAD_EXTENSIONS, MAX_UPLOAD_BYTES } from '@/lib/uploadConstraints';
-import { COMPANY_CODES, nonStockDocOptions } from '@/lib/constants';
+import { COMPANY_CODES } from '@/lib/constants';
 import { useTr } from '@/lib/i18n';
 import type { ExtractedInvoice } from '@/lib/gemini/extract';
 import type { InvoiceRow } from '@/lib/supabase/types';
@@ -185,16 +185,14 @@ export function CaptureView() {
       toast(`Extraction failed for ${f.name}: ${result.error}`);
       return;
     }
-    // Same Gemini extraction for both kinds — Special Invoice just reshapes
-    // the extracted line items into its Material Code table (Item/Material
-    // are left blank since Gemini has no concept of them yet; Description
-    // and Total carry over).
-    const kind = docsRef.current.find(d => d.id === id)?.kind ?? 'standard';
+    // Same Gemini extraction for both kinds — now feeds the Line Items
+    // table directly (the Material Code table is no longer populated from
+    // extraction, since only the Line Items view is shown in this demo).
     updateDoc(id, {
       extracting: false,
       form: formFromExtraction(result.data),
-      lineItems: kind === 'standard' ? result.data.lineItems : [],
-      materialRows: kind === 'special' ? result.data.lineItems.map(li => ({ item: '', material: '', description: li.description, total: li.amount, uom: '' })) : [],
+      lineItems: result.data.lineItems,
+      materialRows: [],
       boxes: result.data.boxes,
       confidence: result.data.confidence,
     });
@@ -322,7 +320,7 @@ export function CaptureView() {
 
   async function store() {
     if (!active) return;
-    const { kind, code, form, lineItems, materialRows, documentHash, confidence, duplicateOf, duplicateReason, overrideDuplicate, file } = active;
+    const { kind, code, form, lineItems, documentHash, confidence, duplicateOf, duplicateReason, overrideDuplicate, file } = active;
     if (dateTooOld(form.date)) { toast(`Date cannot be more than ${MAX_DATE_AGE_MONTHS} months old`); return; }
     if (!form.vendor.trim() || !form.invoiceNumber.trim() || !form.date || !form.companyCode) {
       toast('Vendor, Invoice Number, Date, and Company Code are required'); return;
@@ -346,9 +344,7 @@ export function CaptureView() {
         vendorRef: form.vendorRef,
         stockType: (form.stockType || null) as 'Stock' | 'Non-stock' | 'Stock & Non Stock' | null,
         amount: Number(form.amount) || 0,
-        lineItems: kind === 'standard'
-          ? lineItems.map(li => ({ description: li.description, qty: li.qty, unitPrice: li.unitPrice, amount: li.amount, glCode: li.glCode }))
-          : materialRows.map(r => ({ description: r.description, qty: 1, unitPrice: r.total, amount: r.total, glCode: null, item: r.item || null, material: r.material || null, uom: r.uom || null })),
+        lineItems: lineItems.map(li => ({ description: li.description, qty: li.qty, unitPrice: li.unitPrice, amount: li.amount, glCode: li.glCode })),
         confidence,
         documentHash,
         sapPostingType: form.sapPostingType || null,
@@ -369,7 +365,7 @@ export function CaptureView() {
   }
   function resetActive() {
     if (!active) return;
-    updateDoc(active.id, { form: { ...INITIAL_FORM }, rows: [], materialRows: [] });
+    updateDoc(active.id, { form: { ...INITIAL_FORM }, rows: [], materialRows: [], lineItems: [] });
     toast('Form reset');
   }
   function cancelActive() {
@@ -414,11 +410,11 @@ export function CaptureView() {
 
         {/* Single dropzone — Standard Invoice was removed from the demo;
             "Invoice" here is internally still the former Special Invoice
-            flow (its own Document Number field and a Material Code table
-            instead of Line Items). */}
+            flow (its own Document Number field, now shown with the Line
+            Items table instead of the Material Code table). */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 'var(--gap-5)' }}>
           {([
-            { kind: 'special' as const, title: tr('Invoice'), desc: tr('Upload an invoice — Document Number and a Material Code table (Item, Material, UOM) are captured automatically.') },
+            { kind: 'special' as const, title: tr('Invoice'), desc: tr('Upload an invoice — Document Number and line items are captured automatically.') },
           ]).map(({ kind, title, desc }) => (
             <div key={kind}
               onDragOver={(e) => { e.preventDefault(); setDragKind(kind); }}
@@ -448,7 +444,7 @@ export function CaptureView() {
     );
   }
 
-  const { kind, form, lineItems, materialRows, boxes, rows, confidence, extracting, extractError, checkingDuplicate, duplicateOf, duplicateReason, duplicateBatchWith, overrideDuplicate, previewUrl, file } = active;
+  const { kind, form, lineItems, boxes, confidence, extracting, extractError, checkingDuplicate, duplicateOf, duplicateReason, duplicateBatchWith, overrideDuplicate, previewUrl, file } = active;
   const dateInvalid = dateTooOld(form.date);
   const blockedByDuplicate = duplicateReason !== null && !overrideDuplicate;
   const remainingAfterThis = docs.filter(d => !d.stored && d.id !== active.id).length;
@@ -544,183 +540,70 @@ export function CaptureView() {
       <div className="cap-panes">
         {/* LEFT — indexing form */}
         <div className="cap-form">
-          {kind === 'special' ? (
-            <>
-              <CapField label={tr('Document Type')}><CapInput value={tr('Invoice')} readOnly /></CapField>
-              <CapField label={tr('Status')}><CapInput value={form.status} readOnly /></CapField>
-              <CapField label={tr('Invoice Code')}><CapInput value={active.code} readOnly /></CapField>
+          <CapField label={tr('Document Type')}><CapInput value={tr('Invoice')} readOnly /></CapField>
+          <CapField label={tr('Status')}><CapInput value={form.status} readOnly /></CapField>
+          <CapField label={tr('Invoice Code')}><CapInput value={active.code} readOnly /></CapField>
 
-              <CapField label={tr('Date')} hlKey="date" activeField={activeField} onSelect={setActiveField}>
-                <CapDate value={form.date} onChange={v => set('date', v)} active invalid={dateInvalid} />
-                {dateInvalid && <div className="cap-err"><I.alert size={12} />{tr('Date is more than')} {MAX_DATE_AGE_MONTHS} {tr('months old — not accepted')}</div>}
-              </CapField>
-              <CapField label={tr('Due Date')} hlKey="dueDate" activeField={activeField} onSelect={setActiveField}>
-                <CapDate value={form.dueDate} onChange={v => set('dueDate', v)} />
-              </CapField>
+          <CapField label={tr('Date')} hlKey="date" activeField={activeField} onSelect={setActiveField}>
+            <CapDate value={form.date} onChange={v => set('date', v)} active invalid={dateInvalid} />
+            {dateInvalid && <div className="cap-err"><I.alert size={12} />{tr('Date is more than')} {MAX_DATE_AGE_MONTHS} {tr('months old — not accepted')}</div>}
+          </CapField>
+          <CapField label={tr('Due Date')} hlKey="dueDate" activeField={activeField} onSelect={setActiveField}>
+            <CapDate value={form.dueDate} onChange={v => set('dueDate', v)} />
+          </CapField>
 
-              <CapField label={tr('Vendor')} hlKey="vendor" activeField={activeField} onSelect={setActiveField}><CapInput value={form.vendor} onChange={v => set('vendor', v)} chevron /></CapField>
-              <CapField label={tr('Amount')} hlKey="total" activeField={activeField} onSelect={setActiveField}><CapInput value={form.amount} onChange={v => set('amount', v)} chevron /></CapField>
-              <CapField label={tr('Purchase Order Number')} hlKey="po" activeField={activeField} onSelect={setActiveField}><CapInput value={form.po} onChange={v => set('po', v)} chevron /></CapField>
-              <CapField label={tr('Company Code')} hlKey="companyCode" activeField={activeField} onSelect={setActiveField}>
-                <CapSelect value={form.companyCode} onChange={v => set('companyCode', v)} options={CAP_COMPANY_CODES} />
-                {!form.companyCode && <div className="cap-err"><I.alert size={12} />{tr('Not found on document — select the correct code')}</div>}
-              </CapField>
-              <CapField label={tr('Invoice Number')} hlKey="invoiceNo" activeField={activeField} onSelect={setActiveField}><CapInput value={form.invoiceNumber} readOnly /></CapField>
-              <CapField label={tr('Vendor Reference')} hlKey="vendorRef" activeField={activeField} onSelect={setActiveField}><CapInput value={form.vendorRef} onChange={v => set('vendorRef', v)} chevron /></CapField>
-              <CapField label={tr('Document Number')}><CapInput value={form.documentNumber} onChange={v => set('documentNumber', v)} chevron /></CapField>
+          <CapField label={tr('Vendor')} hlKey="vendor" activeField={activeField} onSelect={setActiveField}><CapInput value={form.vendor} onChange={v => set('vendor', v)} chevron /></CapField>
+          <CapField label={tr('Amount')} hlKey="total" activeField={activeField} onSelect={setActiveField}><CapInput value={form.amount} onChange={v => set('amount', v)} chevron /></CapField>
+          <CapField label={tr('Purchase Order Number')} hlKey="po" activeField={activeField} onSelect={setActiveField}><CapInput value={form.po} onChange={v => set('po', v)} chevron /></CapField>
+          <CapField label={tr('Company Code')} hlKey="companyCode" activeField={activeField} onSelect={setActiveField}>
+            <CapSelect value={form.companyCode} onChange={v => set('companyCode', v)} options={CAP_COMPANY_CODES} />
+            {!form.companyCode && <div className="cap-err"><I.alert size={12} />{tr('Not found on document — select the correct code')}</div>}
+          </CapField>
+          <CapField label={tr('Invoice Number')} hlKey="invoiceNo" activeField={activeField} onSelect={setActiveField}><CapInput value={form.invoiceNumber} readOnly /></CapField>
+          <CapField label={tr('Vendor Reference')} hlKey="vendorRef" activeField={activeField} onSelect={setActiveField}><CapInput value={form.vendorRef} onChange={v => set('vendorRef', v)} chevron /></CapField>
+          <CapField label={tr('Document Number')}><CapInput value={form.documentNumber} onChange={v => set('documentNumber', v)} chevron /></CapField>
 
-              {/* Material Code — replaces Line Items entirely for Special Invoice */}
-              <CapField label={tr('Material Code')} top>
-                <div className="cap-mat-head">
-                  <span className="cap-mat-count">{materialRows.length} {tr('rows')}</span>
-                  <div className="spacer" />
-                  <button className="cap-mat-autofill" onClick={addMaterialRow}><I.plus size={13} />{tr('Add row')}</button>
-                </div>
-                <div className="cap-mat-table">
-                  <div className="cap-li-row cap-mat-colhead">
-                    <div>{tr('Item')}</div>
-                    <div>{tr('Material')}</div>
-                    <div>{tr('Description')}</div>
-                    <div style={{ textAlign: 'right' }}>{tr('Total')}</div>
-                    <div>{tr('UOM')}</div>
-                    <div />
+          {/* Line items — extracted from the document by Gemini; review/edit before storing */}
+          <CapField label={tr('Line Items')} top>
+            <div className="cap-mat-head">
+              <span className="cap-mat-count">{lineItems.length} {tr('lines')}</span>
+              <div className="spacer" />
+              <button className="cap-mat-autofill" onClick={addLineItem}><I.plus size={13} />{tr('Add line')}</button>
+            </div>
+            <div className="cap-mat-table">
+              <div className="cap-li-row cap-mat-colhead">
+                <div>{tr('Description')}</div>
+                <div style={{ textAlign: 'right' }}>{tr('Qty')}</div>
+                <div style={{ textAlign: 'right' }}>{tr('Unit')}</div>
+                <div style={{ textAlign: 'right' }}>{tr('Amount')}</div>
+                <div>{tr('GL')}</div>
+                <div />
+              </div>
+              <div className="cap-mat-body">
+                {lineItems.map((li, i) => (
+                  <div key={i} className="cap-li-row cap-mat-row">
+                    <input className="cap-mat-input" value={li.description} placeholder={tr('Description')}
+                      onChange={e => updateLineItem(i, { description: e.target.value })} />
+                    <input className="cap-mat-input num" value={li.qty} placeholder={tr('Qty')}
+                      onChange={e => updateLineItem(i, { qty: Number(e.target.value) || 0 })} />
+                    <input className="cap-mat-input num" value={li.unitPrice} placeholder={tr('Unit')}
+                      onChange={e => updateLineItem(i, { unitPrice: Number(e.target.value) || 0 })} />
+                    <input className="cap-mat-input num" value={li.amount} placeholder={tr('Amount')}
+                      onChange={e => updateLineItem(i, { amount: Number(e.target.value) || 0 })} />
+                    <input className="cap-mat-input" value={li.glCode ?? ''} placeholder={tr('GL')}
+                      onChange={e => updateLineItem(i, { glCode: e.target.value || null })} />
+                    <button className="cap-mat-del" onClick={() => removeLineItem(i)}><I.x size={13} /></button>
                   </div>
-                  <div className="cap-mat-body">
-                    {materialRows.map((r, i) => (
-                      <div key={i} className="cap-li-row cap-mat-row">
-                        <input className="cap-mat-input" value={r.item} placeholder={tr('Item')}
-                          onChange={e => updateMaterialRow(i, { item: e.target.value })} />
-                        <input className="cap-mat-input" value={r.material} placeholder={tr('Material')}
-                          onChange={e => updateMaterialRow(i, { material: e.target.value })} />
-                        <input className="cap-mat-input" value={r.description} placeholder={tr('Description')}
-                          onChange={e => updateMaterialRow(i, { description: e.target.value })} />
-                        <input className="cap-mat-input num" value={r.total} placeholder={tr('Total')}
-                          onChange={e => updateMaterialRow(i, { total: Number(e.target.value) || 0 })} />
-                        <input className="cap-mat-input" value={r.uom} placeholder={tr('UOM')}
-                          onChange={e => updateMaterialRow(i, { uom: e.target.value })} />
-                        <button className="cap-mat-del" onClick={() => removeMaterialRow(i)}><I.x size={13} /></button>
-                      </div>
-                    ))}
-                    {materialRows.length === 0 && <div className="cap-mat-empty">{tr('No material lines captured — add one manually if needed')}</div>}
-                  </div>
-                </div>
-              </CapField>
+                ))}
+                {lineItems.length === 0 && <div className="cap-mat-empty">{tr('No line items captured — add one manually if needed')}</div>}
+              </div>
+            </div>
+          </CapField>
 
-              <CapField label={tr('Comment')}>
-                <input className="cap-input" style={{ height: 'auto', paddingTop: 6, paddingBottom: 6, paddingRight: 9 }}
-                  value={form.comment} onChange={e => set('comment', e.target.value)} placeholder="" />
-              </CapField>
-            </>
-          ) : (
-            <>
-              <CapField label={tr('Document Type')}><CapInput value={form.docType} readOnly /></CapField>
-              <CapField label={tr('Status')}><CapInput value={form.status} readOnly /></CapField>
-              <CapField label={tr('XML Status')}><CapInput value={form.xmlStatus} readOnly /></CapField>
-              <CapField label={tr('Invoice Code')}><CapInput value={active.code} readOnly /></CapField>
-
-              <CapField label={tr('Date')} hlKey="date" activeField={activeField} onSelect={setActiveField}>
-                <CapDate value={form.date} onChange={v => set('date', v)} active invalid={dateInvalid} />
-                {dateInvalid && <div className="cap-err"><I.alert size={12} />{tr('Date is more than')} {MAX_DATE_AGE_MONTHS} {tr('months old — not accepted')}</div>}
-              </CapField>
-              <CapField label={tr('Due Date')} hlKey="dueDate" activeField={activeField} onSelect={setActiveField}>
-                <CapDate value={form.dueDate} onChange={v => set('dueDate', v)} />
-              </CapField>
-
-              <CapField label={tr('Vendor')} hlKey="vendor" activeField={activeField} onSelect={setActiveField}><CapInput value={form.vendor} onChange={v => set('vendor', v)} chevron /></CapField>
-              <CapField label={tr('Amount')} hlKey="total" activeField={activeField} onSelect={setActiveField}><CapInput value={form.amount} onChange={v => set('amount', v)} chevron /></CapField>
-              <CapField label={tr('Purchase Order Number')} hlKey="po" activeField={activeField} onSelect={setActiveField}><CapInput value={form.po} onChange={v => set('po', v)} chevron /></CapField>
-              <CapField label={tr('Company Code')} hlKey="companyCode" activeField={activeField} onSelect={setActiveField}>
-                <CapSelect value={form.companyCode} onChange={v => set('companyCode', v)} options={CAP_COMPANY_CODES} />
-                {!form.companyCode && <div className="cap-err"><I.alert size={12} />{tr('Not found on document — select the correct code')}</div>}
-              </CapField>
-              <CapField label={tr('Invoice Number')} hlKey="invoiceNo" activeField={activeField} onSelect={setActiveField}><CapInput value={form.invoiceNumber} readOnly /></CapField>
-              <CapField label={tr('Vendor Reference')} hlKey="vendorRef" activeField={activeField} onSelect={setActiveField}><CapInput value={form.vendorRef} onChange={v => set('vendorRef', v)} chevron /></CapField>
-
-              <CapField label={tr('SAP Posting Type')}>
-                <CapSelect value={form.sapPostingType} onChange={v => set('sapPostingType', v)} options={CAP_SAP_TYPES} />
-              </CapField>
-              <CapField label={tr('SAP Invoice Text')}>
-                <input className="cap-input" style={{ height: 'auto', paddingTop: 6, paddingBottom: 6, paddingRight: 9 }}
-                  value={form.sapInvText} onChange={e => set('sapInvText', e.target.value)} placeholder="" />
-              </CapField>
-
-              <CapField label={tr('Stock / Non Stock')}>
-                <CapSelect value={form.stockType} onChange={v => set('stockType', v)} options={CAP_STOCK_TYPES} />
-              </CapField>
-              <CapField label={tr('Stock Document Number')}>
-                <CapInput value={form.stockDocNumber} onChange={v => set('stockDocNumber', v)} chevron
-                  disabled={form.stockType === 'Non-stock'} />
-              </CapField>
-              <CapField label={tr('Non-Stock Document Number')}>
-                <CapSelect value={form.nonStockDocNumber} onChange={v => set('nonStockDocNumber', v)}
-                  options={nonStockDocOptions(form.nonStockDocNumber)} disabled={form.stockType === 'Stock'} />
-              </CapField>
-
-              {/* Line items — extracted from the document by Gemini; review/edit before storing */}
-              <CapField label={tr('Line Items')} top>
-                <div className="cap-mat-head">
-                  <span className="cap-mat-count">{lineItems.length} {tr('lines')}</span>
-                  <div className="spacer" />
-                  <button className="cap-mat-autofill" onClick={addLineItem}><I.plus size={13} />{tr('Add line')}</button>
-                </div>
-                <div className="cap-mat-table">
-                  <div className="cap-li-row cap-mat-colhead">
-                    <div>{tr('Description')}</div>
-                    <div style={{ textAlign: 'right' }}>{tr('Qty')}</div>
-                    <div style={{ textAlign: 'right' }}>{tr('Unit')}</div>
-                    <div style={{ textAlign: 'right' }}>{tr('Amount')}</div>
-                    <div>{tr('GL')}</div>
-                    <div />
-                  </div>
-                  <div className="cap-mat-body">
-                    {lineItems.map((li, i) => (
-                      <div key={i} className="cap-li-row cap-mat-row">
-                        <input className="cap-mat-input" value={li.description} placeholder={tr('Description')}
-                          onChange={e => updateLineItem(i, { description: e.target.value })} />
-                        <input className="cap-mat-input num" value={li.qty} placeholder={tr('Qty')}
-                          onChange={e => updateLineItem(i, { qty: Number(e.target.value) || 0 })} />
-                        <input className="cap-mat-input num" value={li.unitPrice} placeholder={tr('Unit')}
-                          onChange={e => updateLineItem(i, { unitPrice: Number(e.target.value) || 0 })} />
-                        <input className="cap-mat-input num" value={li.amount} placeholder={tr('Amount')}
-                          onChange={e => updateLineItem(i, { amount: Number(e.target.value) || 0 })} />
-                        <input className="cap-mat-input" value={li.glCode ?? ''} placeholder={tr('GL')}
-                          onChange={e => updateLineItem(i, { glCode: e.target.value || null })} />
-                        <button className="cap-mat-del" onClick={() => removeLineItem(i)}><I.x size={13} /></button>
-                      </div>
-                    ))}
-                    {lineItems.length === 0 && <div className="cap-mat-empty">{tr('No line items captured — add one manually if needed')}</div>}
-                  </div>
-                </div>
-              </CapField>
-
-              {/* Material Code table */}
-              <CapField label={tr('Material Code')} top>
-                <div className="cap-mat-head">
-                  <span className="cap-mat-count">{rows.length} {tr('rows')}</span>
-                  <div className="spacer" />
-                  <button className="cap-mat-autofill" onClick={() => toast('Autofill table')}><I.pin size={13} />{tr('Autofill Table')}</button>
-                  <button className="cap-tbtn icon" title={tr('Table options')}><I.dashboard size={15} /></button>
-                </div>
-                <div className="cap-mat-table">
-                  <div className="cap-mat-row cap-mat-colhead">
-                    <div>{tr('Item')}</div>
-                    <div>{tr('Material')}</div>
-                  </div>
-                  <div className="cap-mat-body">
-                    <button className="cap-mat-add" onClick={() => setRows(rs => [...rs, { item: '', material: '' }])} title={tr('Add row')}><I.plus size={14} /></button>
-                    {rows.map((r, i) => (
-                      <div key={i} className="cap-mat-row">
-                        <input className="cap-mat-input" value={r.item} placeholder={tr('Item')} onChange={e => setRows(rs => rs.map((x, j) => j === i ? { ...x, item: e.target.value } : x))} />
-                        <input className="cap-mat-input" value={r.material} placeholder={tr('Material')} onChange={e => setRows(rs => rs.map((x, j) => j === i ? { ...x, material: e.target.value } : x))} />
-                        <button className="cap-mat-del" onClick={() => setRows(rs => rs.filter((_, j) => j !== i))}><I.x size={13} /></button>
-                      </div>
-                    ))}
-                    {rows.length === 0 && <div className="cap-mat-empty">{tr('No material lines')}</div>}
-                  </div>
-                </div>
-              </CapField>
-            </>
-          )}
+          <CapField label={tr('Comment')}>
+            <input className="cap-input" style={{ height: 'auto', paddingTop: 6, paddingBottom: 6, paddingRight: 9 }}
+              value={form.comment} onChange={e => set('comment', e.target.value)} placeholder="" />
+          </CapField>
         </div>
 
         {/* RIGHT — document viewer */}

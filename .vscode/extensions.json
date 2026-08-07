@@ -1,0 +1,7 @@
+{
+    "recommendations": [
+        "amazonwebservices.amazon-q-vscode",
+        "vizards.deepseek-v4-for-copilot",
+        "anthropic.claude-code"
+    ]
+}

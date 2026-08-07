@@ -85,19 +85,6 @@ export function DashboardView({ data, recentActivity }: { data: DashboardData; r
           </div>
         </div>
 
-        {/* Stock vs Non-stock mix donut */}
-        <div className="card">
-          <div className="card-head">
-            <div className="card-title">{tr('Stock vs Non-stock')}</div>
-            <button className="icon-btn" onClick={() => go('invoices')}><I.arrowR size={16} /></button>
-          </div>
-          <div className="card-pad" style={{ display: 'grid', placeItems: 'center', paddingTop: 28 }}>
-            {data.stockMix.length === 0 ? <div className="faint" style={{ fontSize: 13 }}>{tr('No invoices yet.')}</div> : <Donut data={data.stockMix} size={130} thickness={20} />}
-          </div>
-        </div>
-      </div>
-
-      <div style={{ marginBottom: 'var(--gap-5)' }}>
         {/* Action queue */}
         <div className="card">
           <div className="card-head">

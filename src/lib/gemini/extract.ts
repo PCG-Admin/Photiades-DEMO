@@ -50,7 +50,7 @@ const RESPONSE_SCHEMA = {
     po: { type: Type.STRING, nullable: true, description: 'Purchase order number, if referenced on the document' },
     companyCode: { type: Type.STRING, nullable: true },
     vendorRef: { type: Type.STRING, nullable: true, description: "Vendor's own reference / customer number" },
-    currency: { type: Type.STRING, description: 'ISO currency code or symbol, e.g. EUR or €' },
+    currency: { type: Type.STRING, description: 'ISO currency code or symbol, e.g. EUR or R' },
     subtotal: { type: Type.NUMBER, description: 'Total before tax' },
     vat: { type: Type.NUMBER, description: 'Total tax / VAT amount' },
     total: { type: Type.NUMBER, description: 'Grand total including tax' },

@@ -488,10 +488,10 @@ export const TRANSLATIONS: Record<Exclude<Lang, 'en'>, Record<string, string>> =
     'Amount check over 500': 'Έλεγχος ποσού άνω των 500',
     'PurchMgr-Approval': 'Έγκριση Διευθυντή Αγορών',
     'AM - AcDep-Review': 'Έλεγχος Διαχειριστή Λογαριασμού',
-    'AcMgr-Approval': 'Έγκριση Διευθυντή Λογιστηρίου',
+    'Accounts Manager Check': 'Έγκριση Διευθυντή Λογιστηρίου',
     'AcDep-Approval': 'Έγκριση Λογιστηρίου',
     'Req/ner-Approval': 'Έγκριση Αιτούντος',
-    'AcDep-Check': 'Έλεγχος Λογιστηρίου',
+    'Accounts Department Check': 'Έλεγχος Λογιστηρίου',
     'Special Approval': 'Ειδική Έγκριση',
     'AcDep-PendPmt': 'Λογιστήριο — Εκκρεμής Πληρωμή',
 
@@ -533,10 +533,10 @@ export const TRANSLATIONS: Record<Exclude<Lang, 'en'>, Record<string, string>> =
       'Επιβεβαιώστε το εισαγόμενο τιμολόγιο αποθέματος και τα συνοδευτικά έγγραφα πριν τη δρομολόγηση.',
     'Purchasing department reviews the invoice and selects how to route it.':
       'Το τμήμα αγορών ελέγχει το τιμολόγιο και επιλέγει πώς θα δρομολογηθεί.',
-    'Automatic threshold check. Invoices over €500 route to the Purchasing Manager; €500 and under route to the Account Manager.':
-      'Αυτόματος έλεγχος ορίου. Τιμολόγια άνω των €500 δρομολογούνται στον Διευθυντή Αγορών· €500 και κάτω στον Διαχειριστή Λογαριασμού.',
-    'Purchasing Manager approval for invoices over €500, before accounts review.':
-      'Έγκριση Διευθυντή Αγορών για τιμολόγια άνω των €500, πριν τον έλεγχο του λογιστηρίου.',
+    'Automatic threshold check. Invoices over R500 route to the Purchasing Manager; R500 and under route to the Account Manager.':
+      'Αυτόματος έλεγχος ορίου. Τιμολόγια άνω των R500 δρομολογούνται στον Διευθυντή Αγορών· R500 και κάτω στον Διαχειριστή Λογαριασμού.',
+    'Purchasing Manager approval for invoices over R500, before accounts review.':
+      'Έγκριση Διευθυντή Αγορών για τιμολόγια άνω των R500, πριν τον έλεγχο του λογιστηρίου.',
     'Accounts Department review — confirm posting details and SAP invoice text.':
       'Έλεγχος Λογιστηρίου — επιβεβαίωση στοιχείων καταχώρησης και κειμένου τιμολογίου SAP.',
     'Final Accounts Manager approval to release the invoice.':
@@ -562,10 +562,10 @@ export const TRANSLATIONS: Record<Exclude<Lang, 'en'>, Record<string, string>> =
       'Ο αιτών ελέγχει και εγκρίνει το τιμολόγιο μη-αποθέματος.',
     'Purchasing department reviews the non-stock invoice and selects how to route it.':
       'Το τμήμα αγορών ελέγχει το τιμολόγιο μη-αποθέματος και επιλέγει πώς θα δρομολογηθεί.',
-    'Automatic threshold check. Invoices over €500 route to the Purchasing Manager; €500 and under route to FM.':
-      'Αυτόματος έλεγχος ορίου. Τιμολόγια άνω των €500 δρομολογούνται στον Διευθυντή Αγορών· €500 και κάτω στον Διευθυντή Οικονομικών.',
-    'Purchasing Manager approval for non-stock invoices over €500, before accounts review.':
-      'Έγκριση Διευθυντή Αγορών για τιμολόγια μη-αποθέματος άνω των €500, πριν τον έλεγχο του λογιστηρίου.',
+    'Automatic threshold check. Invoices over R500 route to the Purchasing Manager; R500 and under route to FM.':
+      'Αυτόματος έλεγχος ορίου. Τιμολόγια άνω των R500 δρομολογούνται στον Διευθυντή Αγορών· R500 και κάτω στον Διευθυντή Οικονομικών.',
+    'Purchasing Manager approval for non-stock invoices over R500, before accounts review.':
+      'Έγκριση Διευθυντή Αγορών για τιμολόγια μη-αποθέματος άνω των R500, πριν τον έλεγχο του λογιστηρίου.',
     'Final Accounts Manager approval to release the non-stock invoice.':
       'Τελική έγκριση Διευθυντή Λογιστηρίου για την απελευθέρωση του τιμολογίου μη-αποθέματος.',
   },

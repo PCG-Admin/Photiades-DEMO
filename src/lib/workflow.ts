@@ -100,12 +100,12 @@ export const WF_STOCK_TASKS: WFTask[] = [
   },
   {
     id: 't3', name: 'Amount check over 500', role: 'System', stage: 'Routing', auto: true,
-    desc: 'Automatic threshold check. Invoices over €500 route to the Purchasing Manager; €500 and under route to the Account Manager.',
+    desc: 'Automatic threshold check. Invoices over R500 route to the Purchasing Manager; R500 and under route to the Account Manager.',
     branch: { threshold: 500, overIdx: 3, underIdx: 4, over: 'PurchMgr-Approval', under: 'AM - AcDep-Review', skipIdx: 3 },
   },
   {
     id: 't4', name: 'PurchMgr-Approval', role: 'Purchasing Manager', stage: 'Approval',
-    desc: 'Purchasing Manager approval for invoices over €500, before accounts review.',
+    desc: 'Purchasing Manager approval for invoices over R500, before accounts review.',
     actions: [
       { key: 'approved', label: 'Approved', tone: 'green', icon: 'check',
         fields: [
@@ -140,31 +140,7 @@ export const WF_STOCK_TASKS: WFTask[] = [
         fields: [{ k: 'com', label: 'Comment', type: 'textarea', required: true }] },
     ],
   },
-  {
-    id: 't6', name: 'AcMgr-Approval', role: 'Accounts Manager', stage: 'Approval',
-    desc: 'Final Accounts Manager approval to release the invoice.',
-    actions: [
-      { key: 'additional', label: 'Additional Approval', tone: 'violet', icon: 'users',
-        fields: [
-          { k: 'invNo', label: 'Invoice Number', type: 'ro', src: 'invNo' },
-          { k: 'po', label: 'PO Number', type: 'ro', src: 'po' },
-          { k: 'amount', label: 'Amount', type: 'ro-currency', src: 'amount' },
-          { k: 'approver', label: 'Select user to approve', type: 'select', options: [], required: true },
-          { k: 'com', label: 'Comment', type: 'textarea' },
-        ] },
-      { key: 'approved', label: 'Approved', tone: 'green', icon: 'check',
-        fields: [
-          { k: 'invNo', label: 'Invoice Number', type: 'ro', src: 'invNo' },
-          { k: 'po', label: 'PO Number', type: 'ro', src: 'po' },
-          { k: 'amount', label: 'Amount', type: 'ro-currency', src: 'amount' },
-          { k: 'com', label: 'Comment', type: 'textarea' },
-        ] },
-      { key: 'requestInfo', label: 'Request Info', tone: 'amber', icon: 'refresh',
-        fields: [{ k: 'com', label: 'Comment', type: 'textarea', required: true }] },
-      { key: 'declined', label: 'Declined', tone: 'red', icon: 'x',
-        fields: [{ k: 'com', label: 'Comment', type: 'textarea', required: true }] },
-    ],
-  },
+ 
   {
     id: 't7', name: 'AcDep-Approval', role: 'Accounts Department', stage: 'Approval',
     desc: 'Accounts Department final approval — confirm document numbers before releasing for payment.',
@@ -174,21 +150,12 @@ export const WF_STOCK_TASKS: WFTask[] = [
           { k: 'invNo', label: 'Invoice Number', type: 'ro', src: 'invNo' },
           { k: 'po', label: 'PO Number', type: 'ro', src: 'po' },
           { k: 'amount', label: 'Amount', type: 'ro-currency', src: 'amount' },
-          { k: 'stkDoc', label: 'Document Number', type: 'text' },
           { k: 'com', label: 'Comment', type: 'textarea' },
         ] },
       { key: 'requestInfo', label: 'Request Info', tone: 'amber', icon: 'refresh',
         fields: [{ k: 'com', label: 'Comment', type: 'textarea', required: true }] },
       { key: 'declined', label: 'Declined', tone: 'red', icon: 'x',
         fields: [{ k: 'com', label: 'Comment', type: 'textarea', required: true }] },
-      { key: 'pendPmt', label: 'Pend. Pmt', tone: 'teal', icon: 'clock',
-        fields: [
-          { k: 'invNo', label: 'Invoice Number', type: 'ro', src: 'invNo' },
-          { k: 'po', label: 'PO Number', type: 'ro', src: 'po' },
-          { k: 'amount', label: 'Amount', type: 'ro-currency', src: 'amount' },
-          { k: 'stkDoc', label: 'Document Number', type: 'text' },
-          { k: 'com', label: 'Comment', type: 'textarea' },
-        ] },
     ],
   },
 ];
@@ -260,12 +227,12 @@ export const WF_NONSTOCK_TASKS: WFTask[] = [
   },
   {
     id: 'n4', name: 'Amount check over 500', role: 'System', stage: 'Routing', auto: true,
-    desc: 'Automatic threshold check. Invoices over €500 route to the Purchasing Manager; €500 and under route to FM.',
+    desc: 'Automatic threshold check. Invoices over R500 route to the Purchasing Manager; R500 and under route to FM.',
     branch: { threshold: 500, overIdx: 4, underIdx: 5, over: 'PurchMgr-Approval', under: 'AM - AcDep-Review', skipIdx: 4 },
   },
   {
     id: 'n5', name: 'PurchMgr-Approval', role: 'Purchasing Manager', stage: 'Approval',
-    desc: 'Purchasing Manager approval for non-stock invoices over €500, before accounts review.',
+    desc: 'Purchasing Manager approval for non-stock invoices over R500, before accounts review.',
     actions: [
       { key: 'approved', label: 'Approved', tone: 'green', icon: 'check',
         fields: [
@@ -301,7 +268,7 @@ export const WF_NONSTOCK_TASKS: WFTask[] = [
     ],
   },
   {
-    id: 'n7', name: 'AcMgr-Approval', role: 'Accounts Manager', stage: 'Approval',
+    id: 'n7', name: 'Accounts Manager Check', role: 'Accounts Manager', stage: 'Approval',
     desc: 'Final Accounts Manager approval to release the non-stock invoice.',
     actions: [
       { key: 'additional', label: 'Additional Approval', tone: 'violet', icon: 'users',
@@ -334,21 +301,13 @@ export const WF_NONSTOCK_TASKS: WFTask[] = [
           { k: 'invNo', label: 'Invoice Number', type: 'ro', src: 'invNo' },
           { k: 'po', label: 'PO Number', type: 'ro', src: 'po' },
           { k: 'amount', label: 'Amount', type: 'ro-currency', src: 'amount' },
-          { k: 'stkDoc', label: 'Document Number', type: 'text' },
           { k: 'com', label: 'Comment', type: 'textarea' },
         ] },
       { key: 'requestInfo', label: 'Request Info', tone: 'amber', icon: 'refresh',
         fields: [{ k: 'com', label: 'Comment', type: 'textarea', required: true }] },
       { key: 'declined', label: 'Declined', tone: 'red', icon: 'x',
         fields: [{ k: 'com', label: 'Comment', type: 'textarea', required: true }] },
-      { key: 'pendPmt', label: 'Pend. Pmt', tone: 'teal', icon: 'clock',
-        fields: [
-          { k: 'invNo', label: 'Invoice Number', type: 'ro', src: 'invNo' },
-          { k: 'po', label: 'PO Number', type: 'ro', src: 'po' },
-          { k: 'amount', label: 'Amount', type: 'ro-currency', src: 'amount' },
-          { k: 'stkDoc', label: 'Document Number', type: 'text' },
-          { k: 'com', label: 'Comment', type: 'textarea' },
-        ] },
+      
     ],
   },
 ];
@@ -359,45 +318,29 @@ export const WF_NONSTOCK_TASKS: WFTask[] = [
 // has no separate AP Clerk "imported" task — it starts directly with
 // Accounts Department review.
 //
-// This workflow goes: AcDep-Check → AcMgr-Approval → (Special Approval or 
+// This workflow goes: Accounts Department Check → Accounts Manager Check → (Special Approval or 
 // Approve or Request Info) → AcDep-Approval → (Paid or Pend. Pmt) → AcDep-PendPmt
 export const WF_SPECIAL_TASKS: WFTask[] = [
   {
-    id: 'sp1', name: 'AcDep-Check', role: 'Accounts Department', stage: 'Review',
+    id: 'sp1', name: 'Accounts Department Check', role: 'Accounts Department', stage: 'Review',
     desc: 'Accounts Department reviews the special invoice and routes it to the Accounts Manager.',
     actions: [
-      { key: 'sendToAcMgr', label: 'Send to AcMgr', tone: 'blue', icon: 'arrowR', toTaskId: 'sp3',
+      { key: 'sendToAcMgr', label: 'Approved', tone: 'blue', icon: 'arrowR', toTaskId: 'sp3',
         fields: [
           { k: 'invNo', label: 'Invoice Number', type: 'ro', src: 'invNo' },
           { k: 'po', label: 'PO Number', type: 'ro', src: 'po' },
           { k: 'amount', label: 'Amount', type: 'ro-currency', src: 'amount' },
-          { k: 'nonStkDoc', label: 'Document Number', type: 'text' },
           { k: 'com', label: 'Comment', type: 'textarea' },
         ] },
-      { key: 'sendPendPmt', label: 'Pend. Pmt', tone: 'teal', icon: 'clock', toTaskId: 'sp5',
-        fields: [
-          { k: 'invNo', label: 'Invoice Number', type: 'ro', src: 'invNo' },
-          { k: 'po', label: 'PO Number', type: 'ro', src: 'po' },
-          { k: 'amount', label: 'Amount', type: 'ro-currency', src: 'amount' },
-          { k: 'nonStkDoc', label: 'Document Number', type: 'text' },
-          { k: 'com', label: 'Comment', type: 'textarea' },
-        ] },
+    
       { key: 'declined', label: 'Declined', tone: 'red', icon: 'x',
         fields: [{ k: 'com', label: 'Comment', type: 'textarea', required: true }] },
     ],
   },
   {
-    id: 'sp3', name: 'AcMgr-Approval', role: 'Accounts Manager', stage: 'Approval',
+    id: 'sp3', name: 'Accounts Manager Check', role: 'Accounts Manager', stage: 'Approval',
     desc: 'Accounts Manager approval for the special invoice — approve to send to Accounts Department, or route to a special approver.',
     actions: [
-      { key: 'specialApproval', label: 'Additional Approval', tone: 'violet', icon: 'users', toTaskId: 'sp3a',
-        fields: [
-          { k: 'approver', label: 'Select user to approve', type: 'select', options: [], required: true },
-          { k: 'invNo', label: 'Invoice Number', type: 'ro', src: 'invNo' },
-          { k: 'po', label: 'PO Number', type: 'ro', src: 'po' },
-          { k: 'amount', label: 'Amount', type: 'ro-currency', src: 'amount' },
-          { k: 'com', label: 'Comment', type: 'textarea' },
-        ] },
       { key: 'approved', label: 'Approve', tone: 'green', icon: 'check', toTaskId: 'sp4',
         fields: [
           { k: 'invNo', label: 'Invoice Number', type: 'ro', src: 'invNo' },
@@ -417,37 +360,14 @@ export const WF_SPECIAL_TASKS: WFTask[] = [
     ],
   },
   {
-    id: 'sp3a', name: 'Special Approval', role: 'Accounts Manager', stage: 'Approval',
-    desc: 'The specially selected approver reviews the invoice before it returns to Accounts Department.',
+    id: 'sp4', name: 'Accounts Department Approval', role: 'Accounts Department', stage: 'Approval',
+    desc: 'Accounts Department final approval — mark approved, hold for the next payment run, or send back for more information.',
     actions: [
-      { key: 'approved', label: 'Approve', tone: 'green', icon: 'check', toTaskId: 'sp4',
+      { key: 'paidDirect', label: 'Approve', tone: 'green', icon: 'check',
         fields: [
           { k: 'invNo', label: 'Invoice Number', type: 'ro', src: 'invNo' },
           { k: 'po', label: 'PO Number', type: 'ro', src: 'po' },
           { k: 'amount', label: 'Amount', type: 'ro-currency', src: 'amount' },
-          { k: 'com', label: 'Comment', type: 'textarea' },
-        ] },
-      { key: 'requestInfo', label: 'Request Info', tone: 'amber', icon: 'refresh', toTaskId: 'sp1',
-        fields: [
-          { k: 'invNo', label: 'Invoice Number', type: 'ro', src: 'invNo' },
-          { k: 'po', label: 'PO Number', type: 'ro', src: 'po' },
-          { k: 'amount', label: 'Amount', type: 'ro-currency', src: 'amount' },
-          { k: 'com', label: 'Comment', type: 'textarea', required: true },
-        ] },
-      { key: 'declined', label: 'Decline', tone: 'red', icon: 'x',
-        fields: [{ k: 'com', label: 'Comment', type: 'textarea', required: true }] },
-    ],
-  },
-  {
-    id: 'sp4', name: 'AcDep-Approval', role: 'Accounts Department', stage: 'Approval',
-    desc: 'Accounts Department final approval — mark paid, hold for the next payment run, or send back for more information.',
-    actions: [
-      { key: 'paidDirect', label: 'Paid', tone: 'green', icon: 'check',
-        fields: [
-          { k: 'invNo', label: 'Invoice Number', type: 'ro', src: 'invNo' },
-          { k: 'po', label: 'PO Number', type: 'ro', src: 'po' },
-          { k: 'amount', label: 'Amount', type: 'ro-currency', src: 'amount' },
-          { k: 'stkDoc', label: 'Document Number', type: 'text' },
           { k: 'com', label: 'Comment', type: 'textarea' },
         ] },
       { key: 'requestInfo', label: 'Request Info', tone: 'amber', icon: 'refresh', toTaskId: 'sp3',
@@ -457,20 +377,13 @@ export const WF_SPECIAL_TASKS: WFTask[] = [
           { k: 'amount', label: 'Amount', type: 'ro-currency', src: 'amount' },
           { k: 'com', label: 'Comment', type: 'textarea', required: true },
         ] },
-      { key: 'sendPendPmt', label: 'Pend. Pmt', tone: 'teal', icon: 'clock', toTaskId: 'sp5',
-        fields: [
-          { k: 'invNo', label: 'Invoice Number', type: 'ro', src: 'invNo' },
-          { k: 'po', label: 'PO Number', type: 'ro', src: 'po' },
-          { k: 'amount', label: 'Amount', type: 'ro-currency', src: 'amount' },
-          { k: 'nonStkDoc', label: 'Document Number', type: 'text' },
-          { k: 'com', label: 'Comment', type: 'textarea' },
-        ] },
+      
       { key: 'declined', label: 'Decline', tone: 'red', icon: 'x',
         fields: [{ k: 'com', label: 'Comment', type: 'textarea', required: true }] },
     ],
   },
   {
-    id: 'sp5', name: 'AcDep-PendPmt', role: 'Accounts Department', stage: 'Approval',
+    id: 'sp5', name: 'Accounts Department Payment', role: 'Accounts Department', stage: 'Approval',
     desc: 'Held pending payment — mark paid once released, or decline.',
     actions: [
       { key: 'paid', label: 'Paid', tone: 'green', icon: 'check',
@@ -478,7 +391,6 @@ export const WF_SPECIAL_TASKS: WFTask[] = [
           { k: 'invNo', label: 'Invoice Number', type: 'ro', src: 'invNo' },
           { k: 'po', label: 'PO Number', type: 'ro', src: 'po' },
           { k: 'amount', label: 'Amount', type: 'ro-currency', src: 'amount' },
-          { k: 'stkDoc', label: 'Document Number', type: 'text' },
           { k: 'com', label: 'Comment', type: 'textarea' },
         ] },
       { key: 'declined', label: 'Decline', tone: 'red', icon: 'x',

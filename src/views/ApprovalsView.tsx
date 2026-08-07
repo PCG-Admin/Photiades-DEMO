@@ -35,7 +35,7 @@ export function ApprovalsView({ initialItems }: { initialItems: ApprovalInboxIte
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 'var(--gap-4)', marginBottom: 'var(--gap-5)' }}>
         <MiniStat label={tr('Awaiting a decision')} value={items.length} sub={tr('across both workflows')} tone="blue" />
         <MiniStat label={tr('Total value pending')} value={fmtMoney(items.reduce((s, i) => s + i.amount, 0))} tone="violet" />
-        <MiniStat label={tr('High priority')} value={items.filter(i => priorityOf(i.amount) === 'High').length} sub="> €50,000" tone="red" />
+        <MiniStat label={tr('High priority')} value={items.filter(i => priorityOf(i.amount) === 'High').length} sub="> R50,000" tone="red" />
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '380px 1fr', gap: 'var(--gap-5)', height: 'calc(100vh - 290px)' }}>

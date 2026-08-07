@@ -12,7 +12,6 @@ import { DocumentHighlightPreview } from '@/components/DocumentHighlightPreview'
 import { cx, fmtMoney } from '@/lib/utils';
 import { fmtDateShort } from '@/lib/format';
 import { RelativeTime } from '@/components/RelativeTime';
-import { STOCK_TYPES } from '@/lib/constants';
 import { useToast } from '@/components/providers/ToastProvider';
 import { useGo } from '@/lib/navigation';
 import { useTr } from '@/lib/i18n';
@@ -356,7 +355,6 @@ function InvoiceDetail({ code, onBack, onSave, onDelete }: {
           <div className="card">
             <div className="card-head">
               <div className="card-title">{tr('Workflow routing')}</div>
-              {instance && <Badge tone="blue">{instance.wf_id === 'stock' ? tr('Stock') : tr('Non-Stock')} {tr('workflow')}</Badge>}
             </div>
             <div className="card-pad">
               {!instance ? (
@@ -429,7 +427,6 @@ function InvoiceForm({ inv, hoverField, setHoverField, onSave, toast }: {
   toast: ShowToast;
 }) {
   const tr = useTr();
-  const xmlTone = inv.xml_status === 'Exported' ? 'green' : inv.xml_status === 'Failed' ? 'red' : 'amber';
 
   const init = useMemo(() => ({
     date: toISO(inv.received_at),
@@ -492,10 +489,9 @@ function InvoiceForm({ inv, hoverField, setHoverField, onSave, toast }: {
       </div>
 
       {/* Read-only document meta */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', borderBottom: '1px solid var(--border)' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', borderBottom: '1px solid var(--border)' }}>
         <ReadField label={tr('Document Type')} value={tr('Invoice')} />
-        <ReadField label={tr('Status')} value={inv.status} statusTone />
-        <ReadField label={tr('XML Status')} value={inv.xml_status} dot={`var(--${xmlTone})`} noBorder />
+        <ReadField label={tr('Status')} value={inv.status} statusTone noBorder />
       </div>
 
       {/* Editable indexing fields */}
@@ -513,7 +509,7 @@ function InvoiceForm({ inv, hoverField, setHoverField, onSave, toast }: {
 
         <FF label={tr('Amount')} hk="total" hoverField={hoverField} setHoverField={setHoverField}>
           <div style={{ position: 'relative' }}>
-            <span style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', color: 'var(--muted)', fontSize: 13, fontFamily: 'var(--mono)' }}>€</span>
+            <span style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', color: 'var(--muted)', fontSize: 13, fontFamily: 'var(--mono)' }}>R</span>
             <input type="text" inputMode="decimal" className="input mono" style={{ paddingLeft: 24, textAlign: 'right' }}
               value={Number(form.amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               onChange={e => set('amount', Number(e.target.value.replace(/[^0-9.]/g, '')) || 0)} />
@@ -532,17 +528,6 @@ function InvoiceForm({ inv, hoverField, setHoverField, onSave, toast }: {
 
         <FF label={tr('Vendor Reference')} hoverField={hoverField} setHoverField={setHoverField} span2>
           <input type="text" className="input mono" value={form.vendorRef} onChange={e => set('vendorRef', e.target.value)} />
-        </FF>
-
-        <FF label={tr('Stock / Non Stock')} hoverField={hoverField} setHoverField={setHoverField} span2>
-          <select className="input" value={form.stockType} onChange={e => set('stockType', e.target.value)}>
-            <option value="">{tr('— Unclassified —')}</option>
-            {STOCK_TYPES.map(o => <option key={o} value={o}>{tr(o)}</option>)}
-          </select>
-        </FF>
-
-        <FF label={tr('Document Number')} hoverField={hoverField} setHoverField={setHoverField} span2>
-          <input type="text" className="input mono" placeholder="e.g. MIGO-490000" value={form.stockDocNumber} onChange={e => { set('stockDocNumber', e.target.value); set('nonStockDocNumber', e.target.value); }} />
         </FF>
       </div>
     </div>

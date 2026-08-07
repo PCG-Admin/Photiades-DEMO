@@ -26,7 +26,7 @@ export async function deleteApproverMapping(id: string): Promise<void> {
 
 /** Looks up the configured approver for a task at a given invoice amount —
  * the row with the tightest matching [min_amount, max_amount] range wins so
- * a specific bracket (e.g. €500-€5000) takes priority over a catch-all
+ * a specific bracket (e.g. R500-R5000) takes priority over a catch-all
  * (both bounds null). Returns null when no mapping is configured for the
  * task, so callers fall back to the task's fixed WFTask.role. */
 export async function resolveApproverForTask(taskId: string, amount: number): Promise<{ role: AppUserRow['role']; userId: string | null } | null> {

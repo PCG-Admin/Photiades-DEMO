@@ -12,7 +12,7 @@
 
 create extension if not exists pgcrypto;
 
--- ---------- invoice_app_settings (SOW §12 — configurable €500 threshold) ----------
+-- ---------- invoice_app_settings (SOW §12 — configurable R500 threshold) ----------
 create table invoice_app_settings (
   id boolean primary key default true,          -- singleton row pattern
   approval_threshold numeric(14,2) not null default 500.00,

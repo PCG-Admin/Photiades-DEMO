@@ -50,7 +50,7 @@ const RESPONSE_SCHEMA = {
     po: { type: Type.STRING, nullable: true, description: 'Purchase order number, if referenced on the document' },
     companyCode: { type: Type.STRING, nullable: true },
     vendorRef: { type: Type.STRING, nullable: true, description: "Vendor's own reference / customer number" },
-    currency: { type: Type.STRING, description: 'ISO currency code or symbol, e.g. EUR or €' },
+    currency: { type: Type.STRING, description: 'ISO currency code or symbol, e.g. EUR or R' },
     subtotal: { type: Type.NUMBER, description: 'Total before tax' },
     vat: { type: Type.NUMBER, description: 'Total tax / VAT amount' },
     total: { type: Type.NUMBER, description: 'Grand total including tax' },
@@ -128,7 +128,7 @@ export async function extractInvoiceFromFile(bytes: Uint8Array, mimeType: string
   const ai = getGeminiClient();
 
   const response = await ai.models.generateContent({
-    model: 'gemini-2.5-flash',
+    model: 'gemini-3.5-flash-lite',
     contents: [
       {
         role: 'user',
@@ -149,3 +149,4 @@ export async function extractInvoiceFromFile(bytes: Uint8Array, mimeType: string
 
   return JSON.parse(text) as ExtractedInvoice;
 }
+

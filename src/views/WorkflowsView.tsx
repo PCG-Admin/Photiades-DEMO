@@ -350,7 +350,7 @@ function WFTimeline({ tasks, taskIdx, terminal, isComplete, isPendingPmt, additi
             <div style={{ paddingBottom: last ? 0 : 22, flex: 1 }}>
               <div style={{ fontSize: 13.5, fontWeight: 600 }}>{tr(t.name)}</div>
               <div className="faint" style={{ fontSize: 11.5, marginBottom: 6 }}>{tr(t.role)}</div>
-              {skipped && <Badge tone="gray">{tr('Skipped')} · ≤ €{branch!.threshold}</Badge>}
+              {skipped && <Badge tone="gray">{tr('Skipped')} · ≤ R{branch!.threshold}</Badge>}
               {!skipped && active && additionalPending && <Badge tone="violet" dot>{tr('Awaiting additional approval')}</Badge>}
               {!skipped && active && !additionalPending && <Badge tone="blue" dot>{tr('Current')}</Badge>}
               {!skipped && done && <Badge tone="green">{tr('Done')}</Badge>}

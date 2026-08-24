@@ -3,7 +3,7 @@
 import { createServiceClient } from '@/lib/supabase/service';
 import type { AppSettingsRow } from '@/lib/supabase/types';
 
-/** SOW §12 — the Stock/Non-Stock amount-check threshold (default €500) is
+/** SOW §12 — the Stock/Non-Stock amount-check threshold (default R500) is
  * configurable in the system rather than hardcoded. Read by the workflow
  * branch-routing logic in advanceWorkflowTask(). */
 export async function getApprovalThreshold(): Promise<number> {

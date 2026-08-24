@@ -273,7 +273,7 @@ export async function advanceWorkflowTask(instanceId: string, actionKey: string,
         invoicePatch.status = 'Pending Payment';
         break;
       case 'sendPendPmt': {
-        // Special Invoice's "Pend. Pmt" outcome (AcDep-Check and
+        // Special Invoice's "Pend. Pmt" outcome (Accounts Department Check and
         // AcDep-Approval) — unlike Stock/Non-Stock's 'pendPmt', this one
         // actually routes on to the AcDep-PendPmt holding task (toTaskId),
         // so both the status AND the task_idx need to move.

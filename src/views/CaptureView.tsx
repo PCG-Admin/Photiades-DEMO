@@ -561,7 +561,10 @@ export function CaptureView() {
           </CapField>
           <CapField label={tr('Invoice Number')} hlKey="invoiceNo" activeField={activeField} onSelect={setActiveField}><CapInput value={form.invoiceNumber} readOnly /></CapField>
           <CapField label={tr('Vendor Reference')} hlKey="vendorRef" activeField={activeField} onSelect={setActiveField}><CapInput value={form.vendorRef} onChange={v => set('vendorRef', v)} chevron /></CapField>
-          <CapField label={tr('Document Number')}><CapInput value={form.documentNumber} onChange={v => set('documentNumber', v)} chevron /></CapField>
+          <CapField label={tr('Comment')}>
+            <input className="cap-input" style={{ height: 'auto', paddingTop: 6, paddingBottom: 6, paddingRight: 9 }}
+              value={form.comment} onChange={e => set('comment', e.target.value)} placeholder="" />
+          </CapField>
 
           {/* Line items — extracted from the document by Gemini; review/edit before storing */}
           <CapField label={tr('Line Items')} top>
@@ -576,7 +579,6 @@ export function CaptureView() {
                 <div style={{ textAlign: 'right' }}>{tr('Qty')}</div>
                 <div style={{ textAlign: 'right' }}>{tr('Unit')}</div>
                 <div style={{ textAlign: 'right' }}>{tr('Amount')}</div>
-                <div>{tr('GL')}</div>
                 <div />
               </div>
               <div className="cap-mat-body">
@@ -590,8 +592,6 @@ export function CaptureView() {
                       onChange={e => updateLineItem(i, { unitPrice: Number(e.target.value) || 0 })} />
                     <input className="cap-mat-input num" value={li.amount} placeholder={tr('Amount')}
                       onChange={e => updateLineItem(i, { amount: Number(e.target.value) || 0 })} />
-                    <input className="cap-mat-input" value={li.glCode ?? ''} placeholder={tr('GL')}
-                      onChange={e => updateLineItem(i, { glCode: e.target.value || null })} />
                     <button className="cap-mat-del" onClick={() => removeLineItem(i)}><I.x size={13} /></button>
                   </div>
                 ))}
@@ -600,10 +600,7 @@ export function CaptureView() {
             </div>
           </CapField>
 
-          <CapField label={tr('Comment')}>
-            <input className="cap-input" style={{ height: 'auto', paddingTop: 6, paddingBottom: 6, paddingRight: 9 }}
-              value={form.comment} onChange={e => set('comment', e.target.value)} placeholder="" />
-          </CapField>
+          
         </div>
 
         {/* RIGHT — document viewer */}

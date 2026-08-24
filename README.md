@@ -15,7 +15,7 @@ reports), **Audit Trail**, **User Administration**, **Notifications**.
 - **Next.js 16** (App Router, Turbopack) + **React 19**
 - **TypeScript** (strict)
 - **Supabase** (Postgres, via `@supabase/supabase-js`) — all data access
-- **Gemini** (`@google/genai`, `gemini-2.5-flash`) — document field extraction
+- **Gemini** (`@google/genai`, `gemini-3.5-flash-lite`) — document field extraction
 - **next/font** — IBM Plex Sans / IBM Plex Mono
 - Hand-crafted CSS design system (OKLCH color tokens, light/dark themes,
   adjustable accent hue and density) — no UI framework

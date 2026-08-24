@@ -128,7 +128,7 @@ export async function extractInvoiceFromFile(bytes: Uint8Array, mimeType: string
   const ai = getGeminiClient();
 
   const response = await ai.models.generateContent({
-    model: 'gemini-2.5-flash',
+    model: 'gemini-3.5-flash-lite',
     contents: [
       {
         role: 'user',
@@ -149,3 +149,4 @@ export async function extractInvoiceFromFile(bytes: Uint8Array, mimeType: string
 
   return JSON.parse(text) as ExtractedInvoice;
 }
+

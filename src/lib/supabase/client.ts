@@ -8,7 +8,11 @@
 import { createBrowserClient } from '@supabase/ssr';
 import type { Database } from './types';
 import { supabaseUrl, supabaseAnonKey } from './env';
+import { PCG_AUTH_COOKIE } from '@/lib/pcg-demos';
 
 export function createClient() {
-  return createBrowserClient<Database>(supabaseUrl(), supabaseAnonKey());
+  // App-specific cookie name — see PCG_AUTH_COOKIE in src/lib/pcg-demos.ts.
+  return createBrowserClient<Database>(supabaseUrl(), supabaseAnonKey(), {
+    cookieOptions: { name: PCG_AUTH_COOKIE },
+  });
 }

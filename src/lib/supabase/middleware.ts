@@ -61,7 +61,6 @@ export async function updateSession(request: NextRequest) {
   const url = request.nextUrl;
   const rawHandoff = url.searchParams.get(PCG_HANDOFF_PARAM);
   const handoff = rawHandoff && DEMOS.includes(rawHandoff) ? rawHandoff : null;
-  const selectedDemo = handoff || request.cookies.get(PCG_DEMO_COOKIE)?.value || null;
 
   const finalize = (response: NextResponse) => {
     for (const { name, value, options } of pending) response.cookies.set(name, value, options as never);
@@ -82,11 +81,9 @@ export async function updateSession(request: NextRequest) {
   }
 
   const isLoginPage = url.pathname === '/login';
-  const isSelector = url.pathname === '/select-demo';
 
   if (!user && !isLoginPage) return redirectTo('/login');
-  if (user && isLoginPage) return redirectTo(selectedDemo ? '/dashboard' : '/select-demo');
-  if (user && !selectedDemo && !isSelector) return redirectTo('/select-demo');
+  if (user && isLoginPage) return redirectTo('/dashboard');
 
   return finalize(NextResponse.next({ request }));
 }

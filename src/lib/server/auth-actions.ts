@@ -42,7 +42,7 @@ export async function login(_prev: LoginState, formData: FormData): Promise<Logi
   // resolves the user who just signed in.
   await tryRecordAuditEvent({ action: 'Signed in', module: 'Auth', icon: 'logout', tone: 'green' });
 
-  redirect('/select-demo');
+  redirect('/dashboard');
 }
 
 export async function logout() {

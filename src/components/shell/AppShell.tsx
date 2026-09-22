@@ -20,6 +20,7 @@ import { getMyDelegation, setMyDelegation, clearMyDelegation } from '@/lib/serve
 import { errorMessage } from '@/lib/errorMessage';
 import type { AppUserRow, InvoiceRow } from '@/lib/supabase/types';
 import { useTr } from '@/lib/i18n';
+import { PcgDemoSwitcher } from './PcgDemoSwitcher';
 
 interface NavItem { key: string; label: string; icon: IconComponent; count?: number }
 interface NavGroup { section: string; items: NavItem[] }
@@ -121,6 +122,7 @@ export function AppShell({ children, unreadCount, accessibleModules }: { childre
             <h1>{tr(TITLES[route] ?? 'Dashboard')}</h1>
           </div>
           <div className="spacer" />
+          <PcgDemoSwitcher current="photiades" />
           <TopbarSearch />
           <IconBtn icon={t.dark ? I.sun : I.moon} onClick={() => setTweak('dark', !t.dark)} title={tr('Toggle theme')} />
           <IconBtn icon={I.bell} badge={unreadCount > 0} onClick={() => router.push('/notifications')} title={tr('Notifications')} />
